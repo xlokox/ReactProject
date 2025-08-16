@@ -1,0 +1,87 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+const os = require('os');
+
+console.log('🚀 Setting up E-commerce Mobile App with Backend Connectivity...\n');
+
+// Function to get local IP address
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const interface of interfaces[name]) {
+      if (interface.family === 'IPv4' && !interface.internal) {
+        return interface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+// Function to update IP in files
+function updateIPInFile(filePath, oldIP, newIP) {
+  try {
+    if (fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, 'utf8');
+      content = content.replace(new RegExp(oldIP, 'g'), newIP);
+      fs.writeFileSync(filePath, content);
+      console.log(`✅ Updated IP in ${filePath}`);
+    } else {
+      console.log(`⚠️  File not found: ${filePath}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error updating ${filePath}:`, error.message);
+  }
+}
+
+// Main setup function
+function setup() {
+  try {
+    // Get local IP
+    const localIP = getLocalIP();
+    console.log(`🌐 Detected local IP: ${localIP}`);
+
+    // Files to update
+    const filesToUpdate = [
+      'src/api/api.js',
+      'src/services/socketService.js'
+    ];
+
+    // Update IP addresses in files
+    console.log('\n📝 Updating IP addresses in configuration files...');
+    filesToUpdate.forEach(file => {
+      updateIPInFile(file, '192.168.1.100', localIP);
+      updateIPInFile(file, 'localhost', localIP);
+    });
+
+    // Check if backend is running
+    console.log('\n🔍 Checking backend server...');
+    try {
+      const response = execSync(`curl -s http://${localIP}:5001/api/test`, { encoding: 'utf8' });
+      const data = JSON.parse(response);
+      if (data.success) {
+        console.log('✅ Backend server is running and accessible!');
+      }
+    } catch (error) {
+      console.log('⚠️  Backend server not accessible. Make sure to start it with:');
+      console.log('   cd ../backend && npm start');
+    }
+
+    // Installation instructions
+    console.log('\n📦 Next steps:');
+    console.log('1. Install dependencies: npm install');
+    console.log('2. Start backend server: cd ../backend && npm start');
+    console.log('3. Start mobile app: npm start');
+    console.log('4. Scan QR code with Expo Go app');
+    console.log('\n🎉 Setup complete! Your app is ready for full backend connectivity.');
+
+  } catch (error) {
+    console.error('❌ Setup failed:', error.message);
+    process.exit(1);
+  }
+}
+
+// Run setup
+setup();

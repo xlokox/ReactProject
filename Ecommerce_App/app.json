@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "EasyShop Mobile App",
+    "slug": "easyshop-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#059473"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.easyshop.mobileapp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#059473"
+      },
+      "package": "com.easyshop.mobileapp"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
