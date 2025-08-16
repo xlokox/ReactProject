@@ -12,8 +12,10 @@ class SocketService {
   // Initialize socket connection
   async connect() {
     try {
-      // Get the same base URL as API but for socket connection
-      const baseURL = 'http://192.168.1.100:5001'; // Update this IP address
+      // Socket base URL from Expo config (app.config.js -> extra.socketUrl)
+      // Fallback to localhost for dev web
+      const Constants = require('expo-constants').default;
+      const baseURL = (Constants?.expoConfig?.extra?.socketUrl) || 'http://localhost:5001';
       
       this.socket = io(baseURL, {
         transports: ['websocket', 'polling'],

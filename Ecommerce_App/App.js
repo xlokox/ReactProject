@@ -11,8 +11,9 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
 
-// API BASE URL - CONNECT TO YOUR BACKEND
-const API_BASE_URL = 'http://172.20.10.6:5001/api';
+// API BASE URL - from Expo config to avoid hardcoding
+import Constants from 'expo-constants';
+const API_BASE_URL = Constants?.expoConfig?.extra?.apiUrl || 'http://localhost:5001/api';
 
 // API FUNCTIONS - FETCH REAL DATA FROM YOUR BACKEND
 const fetchCategories = async () => {
@@ -273,37 +274,37 @@ const PRODUCTS = [
 const BANNERS = [
   {
     _id: '1',
-    banner: 'http://localhost:3000/images/banner/1.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/1.jpg`,
     link: '/product/details/smartphone',
     title: 'Shop Banner 1'
   },
   {
     _id: '2',
-    banner: 'http://localhost:3000/images/banner/2.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/2.jpg`,
     link: '/product/details/laptop',
     title: 'Shop Banner 2'
   },
   {
     _id: '3',
-    banner: 'http://localhost:3000/images/banner/3.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/3.jpg`,
     link: '/product/details/t-shirt',
     title: 'Shop Banner 3'
   },
   {
     _id: '4',
-    banner: 'http://localhost:3000/images/banner/4.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/4.jpg`,
     link: '/product/details/coffee-maker',
     title: 'Shop Banner 4'
   },
   {
     _id: '5',
-    banner: 'http://localhost:3000/images/banner/5.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/5.jpg`,
     link: '/product/details/novel',
     title: 'Shop Banner 5'
   },
   {
     _id: '6',
-    banner: 'http://localhost:3000/images/banner/6.jpg',
+    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/6.jpg`,
     link: '/product/details/toy-car',
     title: 'Shop Banner 6'
   }
