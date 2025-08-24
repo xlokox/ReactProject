@@ -47,9 +47,9 @@ export default function Banner({ navigation }) {
   const onPressSlide = (slide) => {
     if (!navigation) return;
     if (slide.action?.type === 'category') {
-      navigation.navigate('Products', { category: slide.action.category, fromCategory: true });
+      navigation.navigate({ name: 'Products', params: { category: slide.action.category, fromCategory: true }, merge: true });
     } else if (slide.action?.type === 'sale') {
-      navigation.navigate('Products');
+      navigation.navigate({ name: 'Products', merge: true });
     }
   };
 

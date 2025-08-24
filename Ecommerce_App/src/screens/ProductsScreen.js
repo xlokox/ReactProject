@@ -23,45 +23,51 @@ import getProductImageSource from '../utils/image';
 export default function ProductsScreen({ navigation, route }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState(route.params?.searchQuery || '');
   const [selectedCategory, setSelectedCategory] = useState(route.params?.category || '');
   const [categories, setCategories] = useState([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalProduct, setTotalProduct] = useState(0);
+  const [parPage, setParPage] = useState(12);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    loadProducts();
+    // Reset and load first page when filters change
+    setProducts([]);
+    setPageNumber(1);
+    loadProducts({ reset: true, nextPage: 1 });
     loadCategories();
   }, [searchQuery, selectedCategory]);
 
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const params = {};
+  const buildQueryString = (page) => {
+    const qs = new URLSearchParams({
+      category: selectedCategory || '',
+      searchValue: searchQuery || '',
+      lowPrice: '0',
+      highPrice: '100000',
+      pageNumber: String(page),
+      parPage: String(parPage)
+    }).toString();
+    return qs;
+  };
 
-      if (searchQuery) {
-        const response = await api.get(`/home/query-products?searchValue=${encodeURIComponent(searchQuery)}&&pageNumber=1&&lowPrice=0&&highPrice=100000`);
-        if (response.data?.products) {
-          setProducts(response.data.products);
-        }
-      } else {
-        if (selectedCategory) {
-          params.category = selectedCategory;
-        }
-        const qs = new URLSearchParams({
-          category: params.category || '',
-          lowPrice: '0',
-          highPrice: '100000',
-          pageNumber: '1'
-        }).toString().replace(/%20/g, '+');
-        const response = await api.get(`/home/query-products?${qs}`);
-        if (response.data?.products) {
-          setProducts(response.data.products);
-        }
-      }
+  const loadProducts = async ({ reset = false, nextPage = 1 } = {}) => {
+    try {
+      if (reset) setLoading(true); else setLoadingMore(true);
+      const qs = buildQueryString(nextPage);
+      const response = await api.get(`/home/query-products?${qs}`);
+      const list = Array.isArray(response.data?.products) ? response.data.products : [];
+      const total = response.data?.totalProduct || 0;
+      const per = response.data?.parPage || parPage;
+      setTotalProduct(total);
+      setParPage(per);
+      setProducts(prev => (reset ? list : [...prev, ...list]));
+      setPageNumber(nextPage);
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
-      setLoading(false);
+      if (reset) setLoading(false); else setLoadingMore(false);
     }
   };
 
@@ -158,6 +164,18 @@ export default function ProductsScreen({ navigation, route }) {
           numColumns={2}
           contentContainerStyle={styles.productsList}
           showsVerticalScrollIndicator={false}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            const loaded = products.length;
+            if (!loadingMore && loaded < totalProduct) {
+              loadProducts({ nextPage: pageNumber + 1 });
+            }
+          }}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color="#2196F3" />
+            </View>
+          ) : null}
         />
       )}
     </View>

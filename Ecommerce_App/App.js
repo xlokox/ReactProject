@@ -165,6 +165,7 @@ function HomeScreen({ navigation }) {
   const [topRatedProducts, setTopRatedProducts] = React.useState([]);
   const [discountProducts, setDiscountProducts] = React.useState([]);
   const [productsCount, setProductsCount] = React.useState(0);
+  const flattenRows = (rows) => Array.isArray(rows) ? rows.flat().filter(Boolean) : [];
 
   // Ensure category order is identical (alphabetical)
   const sortedCategories = React.useMemo(
@@ -183,8 +184,8 @@ function HomeScreen({ navigation }) {
     fetchProducts()
       .then(d => {
         if (!mounted) return;
-        setTopRatedProducts((d.topRated_product || []).slice(0, 4));
-        setDiscountProducts((d.discount_product || []).slice(0, 4));
+        setTopRatedProducts(flattenRows(d.topRated_product || []).slice(0, 4));
+        setDiscountProducts(flattenRows(d.discount_product || []).slice(0, 4));
       })
       .catch(() => {
         setTopRatedProducts([]);
@@ -204,13 +205,10 @@ function HomeScreen({ navigation }) {
     setShowCategoryDropdown(false);
     // Navigate to Products screen with category filter
     if (categoryName !== 'All Category') {
-      navigation.navigate('Products', {
-        category: categoryName,
-        fromCategory: true
-      });
+      navigation.navigate({ name: 'Products', params: { category: categoryName, fromCategory: true }, merge: true });
     } else {
       // Show all products when "All Category" is selected
-      navigation.navigate('Products');
+      navigation.navigate({ name: 'Products', merge: true });
     }
   };
 
@@ -238,9 +236,9 @@ function HomeScreen({ navigation }) {
       style={[styles.bannerContainer, { width: width - 30 }]}
       onPress={() => {
           if (item.action?.type === 'category' && item.action.category) {
-            navigation.navigate('Products', { category: item.action.category, fromCategory: true });
+            navigation.navigate({ name: 'Products', params: { category: item.action.category, fromCategory: true }, merge: true });
           } else if (item.action?.type === 'sale') {
-            navigation.navigate('Products');
+            navigation.navigate({ name: 'Products', merge: true });
           }
         }}
     >
@@ -542,31 +540,38 @@ function ProductsScreen({ navigation, route }) {
   const { category } = route.params || {};
   const { addToRecentlyViewed } = useRecentlyViewed();
 
-  // API-driven Products Screen
+  // API-driven Products Screen with pagination (loads all)
   const [products, setProducts] = React.useState([]);
+  const [pageNumber, setPageNumber] = React.useState(1);
+  const [totalProduct, setTotalProduct] = React.useState(0);
+  const [parPage, setParPage] = React.useState(12);
+  const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+
+  const fetchPage = React.useCallback(async (page, reset=false) => {
+    try {
+      if (reset) setLoading(true); else setLoadingMore(true);
+      const qs = `category=${encodeURIComponent(category || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}`;
+      const r = await fetch(`${API_BASE_URL}/home/query-products?${qs}`);
+      const d = await r.json();
+      const live = Array.isArray(d.products) ? d.products : [];
+      setTotalProduct(d.totalProduct || 0);
+      setParPage(d.parPage || parPage);
+      setProducts(prev => reset ? live : [...prev, ...live]);
+      setPageNumber(page);
+    } catch (e) {
+      if (reset) setProducts([]);
+    } finally {
+      if (reset) setLoading(false); else setLoadingMore(false);
+    }
+  }, [category, parPage]);
 
   React.useEffect(() => {
-    let mounted = true;
-    const qs = `category=${encodeURIComponent(category || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=1`;
-    fetch(`${API_BASE_URL}/home/query-products?${qs}`)
-      .then(r => r.json())
-      .then(d => {
-        if (!mounted) return;
-        const live = d && Array.isArray(d.products) ? d.products : [];
-        if (live.length > 0) {
-          setProducts(live);
-        } else {
-          // Enforce backend-only source: show empty list if none
-          setProducts([]);
-        }
-      })
-      .catch(() => {
-        if (!mounted) return;
-        // Fallback on network error: enforce backend-only
-        setProducts([]);
-      });
-    return () => { mounted = false; };
-  }, [category]);
+    // reset on category change
+    setProducts([]);
+    setPageNumber(1);
+    fetchPage(1, true);
+  }, [category, fetchPage]);
 
   const renderProduct = ({ item }) => (
     <TouchableOpacity
@@ -628,6 +633,17 @@ function ProductsScreen({ navigation, route }) {
         numColumns={2}
         contentContainerStyle={styles.productsList}
         showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.4}
+        onEndReached={() => {
+          if (products.length < totalProduct && !loadingMore) {
+            fetchPage(pageNumber + 1);
+          }
+        }}
+        ListFooterComponent={loadingMore ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator size="small" color="#2196F3" />
+          </View>
+        ) : null}
       />
     </View>
   );
@@ -1027,8 +1043,9 @@ function MainTabs() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Store') {
-            iconName = focused ? 'storefront' : 'storefront-outline';
+          } else if (route.name === 'Products') {
+            // Use Ionicons that exist across versions
+            iconName = focused ? 'pricetags' : 'pricetags-outline';
           } else if (route.name === 'Blog') {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Cart') {
@@ -1053,7 +1070,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Store" component={ProductsScreen} />
+      <Tab.Screen name="Products" component={ProductsScreen} />
       <Tab.Screen name="Blog" component={BlogTabScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
