@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { ordersAPI } from '../services/api';
+import api from '../api/api';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState([]);
@@ -24,8 +24,8 @@ export default function OrdersScreen() {
 
   const loadOrders = async () => {
     try {
-      const response = await ordersAPI.getOrders();
-      if (response.data.success) {
+      const response = await api.get('/home/customer/get-orders/me/all');
+      if (response.data?.orders) {
         setOrders(response.data.orders);
       }
     } catch (error) {

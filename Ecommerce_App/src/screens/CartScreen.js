@@ -16,6 +16,7 @@ import {
   Divider,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import getProductImageSource from '../utils/image';
 import { useCart } from '../context/CartContext';
 
 export default function CartScreen({ navigation }) {
@@ -62,9 +63,7 @@ export default function CartScreen({ navigation }) {
     <Card style={styles.cartItem}>
       <View style={styles.itemContainer}>
         <Image
-          source={{ 
-            uri: item.product.images?.[0] || 'https://via.placeholder.com/100x100' 
-          }}
+          source={getProductImageSource(item.product)}
           style={styles.itemImage}
           resizeMode="cover"
         />

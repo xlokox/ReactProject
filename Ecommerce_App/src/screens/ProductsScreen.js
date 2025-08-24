@@ -15,8 +15,10 @@ import {
   ActivityIndicator,
   Chip,
 } from 'react-native-paper';
-import { productsAPI } from '../services/api';
+import api from '../api/api';
 import { useCart } from '../context/CartContext';
+import getProductImageSource from '../utils/image';
+
 
 export default function ProductsScreen({ navigation, route }) {
   const [products, setProducts] = useState([]);
@@ -35,18 +37,24 @@ export default function ProductsScreen({ navigation, route }) {
     try {
       setLoading(true);
       const params = {};
-      
+
       if (searchQuery) {
-        const response = await productsAPI.searchProducts(searchQuery);
-        if (response.data.success) {
+        const response = await api.get(`/home/query-products?searchValue=${encodeURIComponent(searchQuery)}&&pageNumber=1&&lowPrice=0&&highPrice=100000`);
+        if (response.data?.products) {
           setProducts(response.data.products);
         }
       } else {
         if (selectedCategory) {
           params.category = selectedCategory;
         }
-        const response = await productsAPI.getProducts(params);
-        if (response.data.success) {
+        const qs = new URLSearchParams({
+          category: params.category || '',
+          lowPrice: '0',
+          highPrice: '100000',
+          pageNumber: '1'
+        }).toString().replace(/%20/g, '+');
+        const response = await api.get(`/home/query-products?${qs}`);
+        if (response.data?.products) {
           setProducts(response.data.products);
         }
       }
@@ -59,9 +67,9 @@ export default function ProductsScreen({ navigation, route }) {
 
   const loadCategories = async () => {
     try {
-      const response = await productsAPI.getCategories();
-      if (response.data.success) {
-        setCategories(response.data.categories);
+      const response = await api.get('/home/get-categorys');
+      if (response.data?.categorys) {
+        setCategories(response.data.categorys);
       }
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -80,9 +88,7 @@ export default function ProductsScreen({ navigation, route }) {
     >
       <Card style={styles.card}>
         <Image
-          source={{ 
-            uri: item.images?.[0] || 'https://via.placeholder.com/200x200' 
-          }}
+          source={getProductImageSource(item)}
           style={styles.productImage}
           resizeMode="cover"
         />

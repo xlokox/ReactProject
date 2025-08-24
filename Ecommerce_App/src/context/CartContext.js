@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { cartAPI } from '../services/api';
+import api from '../api/api';
 import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
@@ -30,7 +30,7 @@ export const CartProvider = ({ children }) => {
   const loadCart = async () => {
     try {
       setLoading(true);
-      const response = await cartAPI.getCart();
+      const response = await api.get('/home/product/get-card-product/' + user?.id);
       if (response.data.success) {
         setCartItems(response.data.cart);
         setCartCount(response.data.cart.length);

@@ -3,20 +3,44 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import getProductImageSource from './src/utils/image';
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width - 30;
 
-// API BASE URL - from Expo config to avoid hardcoding
+// API BASE URL - prefer env; derive device-reachable fallback in dev
 import Constants from 'expo-constants';
-const API_BASE_URL = Constants?.expoConfig?.extra?.apiUrl || 'http://localhost:5001/api';
+
+const resolveApiBaseUrl = () => {
+
+  const cfg = Constants?.expoConfig?.extra?.apiUrl;
+  // If env config is set and not localhost, use it
+  if (cfg && !/localhost|127\.0\.0\.1/i.test(cfg)) return cfg;
+
+  // Try to derive LAN IP from Expo hostUri (works when using 'LAN' in Expo)
+  const hostUri = (Constants?.expoConfig?.hostUri || Constants?.expoGoConfig?.hostUri || '').toString();
+  const host = hostUri.split(':')[0];
+  const isIp = /^[0-9.]+$/.test(host);
+  if (isIp) return `http://${host}:5001/api`;
+
+  // Fallback to configured value or localhost (simulator only)
+  return cfg || 'http://localhost:5001/api';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+console.log('API_BASE_URL ->', API_BASE_URL);
+
+
+// Image helpers: safe product image selection with placeholder fallback
+// DEPRECATED: image helpers moved to src/utils/image.js
 
 // API FUNCTIONS - FETCH REAL DATA FROM YOUR BACKEND
 const fetchCategories = async () => {
@@ -51,227 +75,7 @@ const fetchProducts = async () => {
   }
 };
 
-// EXACT CATEGORIES FROM YOUR BACKEND - MATCHING FRONTEND
-const CATEGORIES = [
-  { _id: '1', name: 'Electronics', slug: 'electronics', image: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '2', name: 'Clothing', slug: 'clothing', image: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '3', name: 'Home & Kitchen', slug: 'home-kitchen', image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '4', name: 'Books', slug: 'books', image: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '5', name: 'Toys', slug: 'toys', image: 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?q=80&w=2928&auto=format&fit=crop&ixlib=rb-4.0.3' }
-];
 
-// COMPREHENSIVE PRODUCTS - EXACT MATCH WITH BACKEND (40 PRODUCTS)
-const PRODUCTS = [
-  // ELECTRONICS CATEGORY (8 products)
-  {
-    _id: '1', name: 'iPhone 15 Pro', slug: 'iphone-15-pro', category: 'Electronics', brand: 'Apple', price: 999, stock: 50, discount: 5,
-    description: 'Latest iPhone with titanium design and A17 Pro chip', shopName: 'Tech Store', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=2942&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '2', name: 'Samsung Galaxy S24', slug: 'samsung-galaxy-s24', category: 'Electronics', brand: 'Samsung', price: 899, stock: 45, discount: 8,
-    description: 'Flagship Android phone with AI features', shopName: 'Tech Store', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '3', name: 'MacBook Pro M3', slug: 'macbook-pro-m3', category: 'Electronics', brand: 'Apple', price: 1999, stock: 25, discount: 10,
-    description: 'Professional laptop with M3 chip for creators', shopName: 'Tech Store', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=2942&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '4', name: 'Dell XPS 13', slug: 'dell-xps-13', category: 'Electronics', brand: 'Dell', price: 1299, stock: 30, discount: 15,
-    description: 'Ultrabook with Intel Core i7 and premium design', shopName: 'Tech Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1531297484001-80022131f5a1?q=80&w=2920&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '5', name: 'Sony WH-1000XM5', slug: 'sony-wh-1000xm5', category: 'Electronics', brand: 'Sony', price: 399, stock: 60, discount: 12,
-    description: 'Premium noise-canceling wireless headphones', shopName: 'Audio Pro', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1546435770-a3e426bf472b?q=80&w=2865&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '6', name: 'Apple Watch Series 9', slug: 'apple-watch-series-9', category: 'Electronics', brand: 'Apple', price: 429, stock: 40, discount: 7,
-    description: 'Advanced smartwatch with health monitoring', shopName: 'Tech Store', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1579586337278-3befd40fd17a?q=80&w=2872&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '7', name: 'iPad Air', slug: 'ipad-air', category: 'Electronics', brand: 'Apple', price: 599, stock: 35, discount: 6,
-    description: 'Powerful tablet for work and creativity', shopName: 'Tech Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '8', name: 'Gaming Console', slug: 'gaming-console', category: 'Electronics', brand: 'Sony', price: 499, stock: 20, discount: 0,
-    description: 'Next-gen gaming console with 4K graphics', shopName: 'Gaming Zone', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // CLOTHING CATEGORY (8 products)
-  {
-    _id: '9', name: 'Premium Cotton T-Shirt', slug: 'premium-cotton-tshirt', category: 'Clothing', brand: 'Nike', price: 29.99, stock: 100, discount: 5,
-    description: 'Comfortable cotton t-shirt for everyday wear', shopName: 'Fashion Hub', rating: 4.2,
-    images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=2880&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '10', name: 'Elegant Summer Dress', slug: 'elegant-summer-dress', category: 'Clothing', brand: 'Zara', price: 79.99, stock: 80, discount: 15,
-    description: 'Beautiful summer dress for special occasions', shopName: 'Fashion Hub', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '11', name: 'Running Sneakers', slug: 'running-sneakers', category: 'Clothing', brand: 'Adidas', price: 129.99, stock: 70, discount: 20,
-    description: 'High-performance running shoes with boost technology', shopName: 'Sports World', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=2912&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '12', name: 'Denim Jeans', slug: 'denim-jeans', category: 'Clothing', brand: 'Levis', price: 89.99, stock: 90, discount: 10,
-    description: 'Classic denim jeans with perfect fit', shopName: 'Fashion Hub', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=2926&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '13', name: 'Winter Jacket', slug: 'winter-jacket', category: 'Clothing', brand: 'North Face', price: 199.99, stock: 40, discount: 25,
-    description: 'Warm winter jacket for cold weather', shopName: 'Outdoor Gear', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '14', name: 'Business Shirt', slug: 'business-shirt', category: 'Clothing', brand: 'Hugo Boss', price: 119.99, stock: 60, discount: 8,
-    description: 'Professional business shirt for office wear', shopName: 'Business Attire', rating: 4.3,
-    images: ['https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '15', name: 'Sports Hoodie', slug: 'sports-hoodie', category: 'Clothing', brand: 'Under Armour', price: 69.99, stock: 85, discount: 12,
-    description: 'Comfortable hoodie for sports and casual wear', shopName: 'Sports World', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '16', name: 'Formal Shoes', slug: 'formal-shoes', category: 'Clothing', brand: 'Clarks', price: 149.99, stock: 50, discount: 18,
-    description: 'Elegant formal shoes for business occasions', shopName: 'Shoe Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // HOME & KITCHEN CATEGORY (8 products)
-  {
-    _id: '17', name: 'Smart Coffee Maker', slug: 'smart-coffee-maker', category: 'Home & Kitchen', brand: 'Breville', price: 299.99, stock: 35, discount: 18,
-    description: 'WiFi-enabled coffee maker with app control', shopName: 'Home Essentials', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '18', name: 'Air Fryer', slug: 'air-fryer', category: 'Home & Kitchen', brand: 'Ninja', price: 149.99, stock: 45, discount: 22,
-    description: 'Healthy cooking with hot air circulation', shopName: 'Kitchen Pro', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1585515656643-1e4d1d6d8c8b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '19', name: 'Blender', slug: 'blender', category: 'Home & Kitchen', brand: 'Vitamix', price: 399.99, stock: 25, discount: 15,
-    description: 'Professional-grade blender for smoothies and more', shopName: 'Kitchen Pro', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1570197788417-0e82375c9371?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '20', name: 'Non-Stick Pan Set', slug: 'non-stick-pan-set', category: 'Home & Kitchen', brand: 'Tefal', price: 89.99, stock: 60, discount: 12,
-    description: 'Complete set of non-stick cooking pans', shopName: 'Kitchen Essentials', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '21', name: 'Microwave Oven', slug: 'microwave-oven', category: 'Home & Kitchen', brand: 'Panasonic', price: 199.99, stock: 30, discount: 10,
-    description: 'Compact microwave with multiple cooking modes', shopName: 'Home Appliances', rating: 4.3,
-    images: ['https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '22', name: 'Knife Set', slug: 'knife-set', category: 'Home & Kitchen', brand: 'Wusthof', price: 249.99, stock: 40, discount: 20,
-    description: 'Professional chef knife set with wooden block', shopName: 'Kitchen Pro', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1593618998160-e34014e67546?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '23', name: 'Rice Cooker', slug: 'rice-cooker', category: 'Home & Kitchen', brand: 'Zojirushi', price: 179.99, stock: 35, discount: 8,
-    description: 'Smart rice cooker with fuzzy logic technology', shopName: 'Kitchen Essentials', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '24', name: 'Stand Mixer', slug: 'stand-mixer', category: 'Home & Kitchen', brand: 'KitchenAid', price: 349.99, stock: 20, discount: 25,
-    description: 'Professional stand mixer for baking enthusiasts', shopName: 'Baking Supplies', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // BOOKS CATEGORY (8 products)
-  {
-    _id: '25', name: 'The Great Novel', slug: 'the-great-novel', category: 'Books', brand: 'Penguin', price: 24.99, stock: 200, discount: 0,
-    description: 'Bestselling fiction novel that captivates readers', shopName: 'Book World', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=2787&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '26', name: 'Business Strategy Guide', slug: 'business-strategy-guide', category: 'Books', brand: 'Harvard Business', price: 34.99, stock: 150, discount: 5,
-    description: 'Comprehensive guide to modern business strategies', shopName: 'Book World', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=2798&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '27', name: 'Cooking Masterclass', slug: 'cooking-masterclass', category: 'Books', brand: 'Gordon Ramsay', price: 29.99, stock: 100, discount: 10,
-    description: 'Learn professional cooking techniques from the master', shopName: 'Culinary Books', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '28', name: 'Science Fiction Epic', slug: 'science-fiction-epic', category: 'Books', brand: 'Orbit Books', price: 19.99, stock: 180, discount: 8,
-    description: 'Epic space adventure that spans galaxies', shopName: 'Sci-Fi Corner', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '29', name: 'Self-Help Guide', slug: 'self-help-guide', category: 'Books', brand: 'Random House', price: 22.99, stock: 120, discount: 12,
-    description: 'Transform your life with proven strategies', shopName: 'Personal Development', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '30', name: 'History Chronicles', slug: 'history-chronicles', category: 'Books', brand: 'Oxford Press', price: 39.99, stock: 80, discount: 15,
-    description: 'Comprehensive history of ancient civilizations', shopName: 'Academic Books', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '31', name: 'Programming Fundamentals', slug: 'programming-fundamentals', category: 'Books', brand: 'Tech Publications', price: 49.99, stock: 90, discount: 20,
-    description: 'Learn programming from basics to advanced concepts', shopName: 'Tech Books', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '32', name: 'Art & Design Inspiration', slug: 'art-design-inspiration', category: 'Books', brand: 'Creative Press', price: 32.99, stock: 70, discount: 6,
-    description: 'Beautiful collection of modern art and design', shopName: 'Art Books', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // TOYS CATEGORY (8 products)
-  {
-    _id: '33', name: 'Remote Control Drone', slug: 'remote-control-drone', category: 'Toys', brand: 'DJI', price: 199.99, stock: 45, discount: 15,
-    description: 'High-tech drone for outdoor adventures', shopName: 'Toy Land', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '34', name: 'LEGO Architecture Set', slug: 'lego-architecture-set', category: 'Toys', brand: 'LEGO', price: 89.99, stock: 60, discount: 10,
-    description: 'Build famous landmarks with detailed LEGO sets', shopName: 'Building Blocks', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '35', name: 'Board Game Collection', slug: 'board-game-collection', category: 'Toys', brand: 'Hasbro', price: 49.99, stock: 85, discount: 12,
-    description: 'Classic board games for family entertainment', shopName: 'Game Central', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?q=80&w=2831&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '36', name: 'Action Figure Set', slug: 'action-figure-set', category: 'Toys', brand: 'Marvel', price: 34.99, stock: 100, discount: 8,
-    description: 'Collectible superhero action figures', shopName: 'Hero Toys', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '37', name: 'Educational Puzzle', slug: 'educational-puzzle', category: 'Toys', brand: 'Ravensburger', price: 24.99, stock: 120, discount: 5,
-    description: 'Educational jigsaw puzzle for learning and fun', shopName: 'Learning Toys', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '38', name: 'RC Racing Car', slug: 'rc-racing-car', category: 'Toys', brand: 'Hot Wheels', price: 79.99, stock: 55, discount: 18,
-    description: 'High-speed remote control racing car', shopName: 'Speed Toys', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1594787318286-3d835c1d207f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '39', name: 'Dollhouse Playset', slug: 'dollhouse-playset', category: 'Toys', brand: 'Barbie', price: 129.99, stock: 40, discount: 22,
-    description: 'Complete dollhouse with furniture and accessories', shopName: 'Doll World', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '40', name: 'Science Experiment Kit', slug: 'science-experiment-kit', category: 'Toys', brand: 'National Geographic', price: 59.99, stock: 70, discount: 14,
-    description: 'Hands-on science experiments for curious minds', shopName: 'STEM Toys', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  }
-];
 
 // HERO BANNERS — curated, clickable slides
 const BANNERS = [
@@ -356,16 +160,42 @@ function HomeScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = React.useState('All Category');
   const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
 
-  // USE HARDCODED DATA FOR NOW - DIVERSIFIED FOR EACH SECTION
-  const categoriesData = CATEGORIES;
 
-  // Create diverse product selections to avoid repetition
-  const topRatedProducts = PRODUCTS.filter(p => p.rating >= 4.7).slice(0, 4); // Highest rated only
-  const discountProducts = PRODUCTS.filter(p => p.discount >= 10 && p.rating < 4.7).slice(0, 4); // Different products with good discounts
+  // API-driven product selections
+  const [topRatedProducts, setTopRatedProducts] = React.useState([]);
+  const [discountProducts, setDiscountProducts] = React.useState([]);
+  const [productsCount, setProductsCount] = React.useState(0);
 
-  // Load categories on component mount
+  // Ensure category order is identical (alphabetical)
+  const sortedCategories = React.useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories]
+  );
+
+  // Load live categories and product summaries from backend
   React.useEffect(() => {
-    setCategories(categoriesData);
+    let mounted = true;
+    // Categories
+    fetchCategories()
+      .then(list => { if (mounted) setCategories(list || []); })
+      .catch(() => { if (mounted) setCategories([]); });
+    // Products summary for home sections
+    fetchProducts()
+      .then(d => {
+        if (!mounted) return;
+        setTopRatedProducts((d.topRated_product || []).slice(0, 4));
+        setDiscountProducts((d.discount_product || []).slice(0, 4));
+      })
+      .catch(() => {
+        setTopRatedProducts([]);
+        setDiscountProducts([]);
+      });
+    // Total products count for "View All" button
+    fetch(`${API_BASE_URL}/home/query-products?lowPrice=0&&highPrice=100000&&pageNumber=1`)
+      .then(r => r.json())
+      .then(d => { if (mounted) setProductsCount(d.totalProduct || 0); })
+      .catch(() => { if (mounted) setProductsCount(0); });
+    return () => { mounted = false; };
   }, []);
 
   // Handle category selection
@@ -491,7 +321,7 @@ function HomeScreen({ navigation }) {
         navigation.navigate('ProductDetail', { product: item });
       }}
     >
-      <Image source={{ uri: item.images[0] }} style={styles.productImage} />
+      <Image source={getProductImageSource(item)} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.productBrand}>{item.brand}</Text>
@@ -627,7 +457,7 @@ function HomeScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Shop by Category</Text>
         <FlatList
-          data={categories}
+          data={sortedCategories}
           renderItem={renderCategory}
           keyExtractor={(item) => item._id}
           horizontal
@@ -640,7 +470,7 @@ function HomeScreen({ navigation }) {
           style={styles.viewAllButton}
           onPress={() => navigation.navigate('Products')}
         >
-          <Text style={styles.viewAllButtonText}>View All Products ({PRODUCTS.length})</Text>
+          <Text style={styles.viewAllButtonText}>View All Products ({productsCount})</Text>
         </TouchableOpacity>
       </View>
 
@@ -712,11 +542,31 @@ function ProductsScreen({ navigation, route }) {
   const { category } = route.params || {};
   const { addToRecentlyViewed } = useRecentlyViewed();
 
-  // If accessed from bottom tab, always show all products
-  // If accessed from category selection, show filtered products
-  const filteredProducts = category && route.params?.fromCategory
-    ? PRODUCTS.filter(p => p.category === category)
-    : PRODUCTS;
+  // API-driven Products Screen
+  const [products, setProducts] = React.useState([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const qs = `category=${encodeURIComponent(category || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=1`;
+    fetch(`${API_BASE_URL}/home/query-products?${qs}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!mounted) return;
+        const live = d && Array.isArray(d.products) ? d.products : [];
+        if (live.length > 0) {
+          setProducts(live);
+        } else {
+          // Enforce backend-only source: show empty list if none
+          setProducts([]);
+        }
+      })
+      .catch(() => {
+        if (!mounted) return;
+        // Fallback on network error: enforce backend-only
+        setProducts([]);
+      });
+    return () => { mounted = false; };
+  }, [category]);
 
   const renderProduct = ({ item }) => (
     <TouchableOpacity
@@ -726,7 +576,7 @@ function ProductsScreen({ navigation, route }) {
         navigation.navigate('ProductDetail', { product: item });
       }}
     >
-      <Image source={{ uri: item.images[0] }} style={styles.productImage} />
+      <Image source={getProductImageSource(item)} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.productBrand}>{item.brand}</Text>
@@ -772,7 +622,7 @@ function ProductsScreen({ navigation, route }) {
       </View>
 
       <FlatList
-        data={filteredProducts}
+        data={products}
         renderItem={renderProduct}
         keyExtractor={(item) => item._id}
         numColumns={2}
@@ -966,7 +816,7 @@ function ProductDetailScreen({ navigation, route }) {
       </View>
 
       {/* People Also Like Section */}
-      {suggestedProducts.length > 0 && (
+      {__DEV__ && suggestedProducts.length > 0 && (
         <View style={styles.suggestionsSection}>
           <Text style={styles.suggestionsTitle}>People also like</Text>
           <FlatList
@@ -977,7 +827,7 @@ function ProductDetailScreen({ navigation, route }) {
                 style={styles.suggestionCard}
                 onPress={() => navigation.push('ProductDetail', { product: item })}
               >
-                <Image source={{ uri: item.images[0] }} style={styles.suggestionImage} />
+                <Image source={getProductImageSource(item)} style={styles.suggestionImage} />
                 <View style={styles.suggestionInfo}>
                   <Text style={styles.suggestionName} numberOfLines={2}>{item.name}</Text>
                   <Text style={styles.suggestionBrand}>{item.brand}</Text>

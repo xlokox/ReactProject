@@ -10,6 +10,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { add_to_card, add_to_wishlist } from '../store/reducers/cardReducer';
+import getProductImageSource from '../utils/image';
 
 export default function Products({ title, products, navigation }) {
   const dispatch = useDispatch();
@@ -51,9 +52,7 @@ export default function Products({ title, products, navigation }) {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ 
-            uri: item.images?.[0] || 'https://via.placeholder.com/150x150'
-          }}
+          source={getProductImageSource(item)}
           style={styles.productImage}
           resizeMode="cover"
         />

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '../services/api';
+import api from '../api/api';
 
 const AuthContext = createContext();
 
@@ -23,9 +23,9 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthState = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('userToken');
-      const storedUser = await AsyncStorage.getItem('userData');
-      
+      const storedToken = await AsyncStorage.getItem('customerToken');
+      const storedUser = await AsyncStorage.getItem('customerInfo');
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
@@ -40,21 +40,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setLoading(true);
-      const response = await authAPI.login(email, password);
-      
-      if (response.data.success) {
-        const { token: userToken, user: userData } = response.data;
-        
-        await AsyncStorage.setItem('userToken', userToken);
-        await AsyncStorage.setItem('userData', JSON.stringify(userData));
-        
-        setToken(userToken);
-        setUser(userData);
-        
-        return { success: true };
-      } else {
-        return { success: false, message: response.data.message };
+      const { data } = await api.post('/customer/login', { email, password });
+
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
       }
+      if (data?.userInfo) {
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+      }
+      setToken(data?.token || null);
+      setUser(data?.userInfo || null);
+      return { success: true };
     } catch (error) {
       console.error('Login error:', error);
       return { 
@@ -69,13 +65,8 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      const response = await authAPI.register(userData);
-      
-      if (response.data.success) {
-        return { success: true, message: 'הרשמה בוצעה בהצלחה' };
-      } else {
-        return { success: false, message: response.data.message };
-      }
+      const { data } = await api.post('/customer/register', userData);
+      return { success: !!data, message: data?.message || 'הרשמה בוצעה בהצלחה' };
     } catch (error) {
       console.error('Register error:', error);
       return { 
@@ -89,8 +80,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('customerToken');
+      await AsyncStorage.removeItem('customerInfo');
       setToken(null);
       setUser(null);
     } catch (error) {

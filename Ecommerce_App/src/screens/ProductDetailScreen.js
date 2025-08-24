@@ -32,8 +32,8 @@ export default function ProductDetailScreen({ route, navigation }) {
   return (
     <ScrollView style={styles.container}>
       <Image
-        source={{ 
-          uri: product.images?.[0] || 'https://via.placeholder.com/400x300' 
+        source={{
+          uri: (Array.isArray(product.images) && product.images[0]) ? product.images[0] : 'https://via.placeholder.com/400x300'
         }}
         style={styles.productImage}
         resizeMode="cover"
