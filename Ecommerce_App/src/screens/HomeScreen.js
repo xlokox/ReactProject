@@ -39,7 +39,7 @@ export default function HomeScreen({ navigation }) {
     <ScrollView style={styles.container}>
       <Header navigation={navigation} />
       <ConnectionTest />
-      <Banner />
+      <Banner navigation={navigation} />
       <Categories navigation={navigation} />
 
       <View style={styles.section}>

@@ -4,12 +4,15 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
+import EditProfileScreen from './src/screens/EditProfileScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
+const ITEM_WIDTH = width - 30;
 
 // API BASE URL - from Expo config to avoid hardcoding
 import Constants from 'expo-constants';
@@ -270,43 +273,28 @@ const PRODUCTS = [
   }
 ];
 
-// EXACT BANNERS FROM YOUR WEBSITE - SAME AS FRONTEND
+// HERO BANNERS — curated, clickable slides
 const BANNERS = [
   {
-    _id: '1',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/1.jpg`,
-    link: '/product/details/smartphone',
-    title: 'Shop Banner 1'
+    _id: 'sale',
+    banner: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=2940&q=80',
+    title: 'Our Latest Deals',
+    label: 'Our Latest Deals',
+    action: { type: 'sale' }
   },
   {
-    _id: '2',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/2.jpg`,
-    link: '/product/details/laptop',
-    title: 'Shop Banner 2'
+    _id: 'electronics',
+    banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2940&q=80',
+    title: 'Our Newst Electronics',
+    label: 'Our Newst Electronics',
+    action: { type: 'category', category: 'Electronics' }
   },
   {
-    _id: '3',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/3.jpg`,
-    link: '/product/details/t-shirt',
-    title: 'Shop Banner 3'
-  },
-  {
-    _id: '4',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/4.jpg`,
-    link: '/product/details/coffee-maker',
-    title: 'Shop Banner 4'
-  },
-  {
-    _id: '5',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/5.jpg`,
-    link: '/product/details/novel',
-    title: 'Shop Banner 5'
-  },
-  {
-    _id: '6',
-    banner: `${Constants?.expoConfig?.extra?.apiUrl?.replace('/api','') || 'http://localhost:3000'}/images/banner/6.jpg`,
-    link: '/product/details/toy-car',
-    title: 'Shop Banner 6'
+    _id: 'toys',
+    banner: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1600&q=80',
+    title: 'Our Newst Toys',
+    label: 'Our Newst Toys',
+    action: { type: 'category', category: 'Toys' }
   }
 ];
 
@@ -368,11 +356,12 @@ function HomeScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = React.useState('All Category');
   const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
 
-  // USE HARDCODED DATA FOR NOW - WORKING PERFECTLY
+  // USE HARDCODED DATA FOR NOW - DIVERSIFIED FOR EACH SECTION
   const categoriesData = CATEGORIES;
-  const products = PRODUCTS;
-  const topRatedProducts = PRODUCTS.filter(p => p.rating >= 4.5); // Top rated
-  const discountProducts = PRODUCTS.filter(p => p.discount > 0); // Products with discount
+
+  // Create diverse product selections to avoid repetition
+  const topRatedProducts = PRODUCTS.filter(p => p.rating >= 4.7).slice(0, 4); // Highest rated only
+  const discountProducts = PRODUCTS.filter(p => p.discount >= 10 && p.rating < 4.7).slice(0, 4); // Different products with good discounts
 
   // Load categories on component mount
   React.useEffect(() => {
@@ -395,26 +384,35 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  // Auto-scroll banner carousel every 3 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (bannerRef.current) {
-        const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
-        bannerRef.current.scrollToIndex({
-          index: nextIndex,
-          animated: true
-        });
-        setCurrentBannerIndex(nextIndex);
-      }
-    }, 3000);
+  // Improved auto-scroll: pauses during user interaction and resumes smoothly
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const autoTimerRef = useRef(null);
+  const resumeTimerRef = useRef(null);
 
-    return () => clearInterval(interval);
-  }, [currentBannerIndex]);
+  useEffect(() => {
+    if (isUserInteracting) return;
+    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    autoTimerRef.current = setInterval(() => {
+      if (!bannerRef.current) return;
+      const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
+      bannerRef.current.scrollToIndex({ index: nextIndex, animated: true });
+      setCurrentBannerIndex(nextIndex);
+    }, 3500);
+    return () => {
+      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    };
+  }, [currentBannerIndex, isUserInteracting]);
 
   const renderBanner = ({ item, index }) => (
     <TouchableOpacity
       style={[styles.bannerContainer, { width: width - 30 }]}
-      onPress={() => console.log('Banner clicked:', item.title)}
+      onPress={() => {
+          if (item.action?.type === 'category' && item.action.category) {
+            navigation.navigate('Products', { category: item.action.category, fromCategory: true });
+          } else if (item.action?.type === 'sale') {
+            navigation.navigate('Products');
+          }
+        }}
     >
       <Image
         source={{ uri: item.banner }}
@@ -423,9 +421,19 @@ function HomeScreen({ navigation }) {
           console.log('Banner image failed to load:', item.banner);
         }}
       />
-      {/* Banner Overlay with "SHOP" text like website */}
-      <View style={styles.bannerOverlay}>
-        <Text style={styles.bannerShopText}>SHOP</Text>
+      {/* Dynamic overlay text per banner and better touch handling */}
+      <View style={styles.bannerOverlay}
+        onStartShouldSetResponder={() => { setIsUserInteracting(true); return false; }}
+        onResponderRelease={() => {
+          clearTimeout(resumeTimerRef.current);
+          resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
+        }}
+      >
+        <Text style={styles.bannerShopText} numberOfLines={1}>
+          {item.label || (item.action?.type === 'category' && item.action.category
+            ? `Our Newst ${item.action.category}`
+            : 'Our Latest Deals')}
+        </Text>
       </View>
 
       {/* Navigation Arrows */}
@@ -434,9 +442,12 @@ function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.bannerArrow, styles.bannerArrowLeft]}
             onPress={() => {
+              setIsUserInteracting(true);
               const prevIndex = currentBannerIndex === 0 ? BANNERS.length - 1 : currentBannerIndex - 1;
               bannerRef.current?.scrollToIndex({ index: prevIndex, animated: true });
               setCurrentBannerIndex(prevIndex);
+              clearTimeout(resumeTimerRef.current);
+              resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
             }}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />
@@ -445,9 +456,12 @@ function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.bannerArrow, styles.bannerArrowRight]}
             onPress={() => {
+              setIsUserInteracting(true);
               const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
               bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
               setCurrentBannerIndex(nextIndex);
+              clearTimeout(resumeTimerRef.current);
+              resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
             }}
           >
             <Ionicons name="chevron-forward" size={20} color="#ffffff" />
@@ -515,10 +529,11 @@ function HomeScreen({ navigation }) {
         {/* EASY SHOP Logo Header */}
         <View style={styles.mainHeader}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <Text style={styles.logoF}>F</Text>
-            </View>
-            <Text style={styles.logoText}>EASY SHOP</Text>
+            <Image
+              source={require('./src/Images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconButton}>
@@ -575,11 +590,17 @@ function HomeScreen({ navigation }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           pagingEnabled
-          snapToInterval={width - 30}
+          snapToInterval={ITEM_WIDTH}
+          getItemLayout={(_, i) => ({ length: ITEM_WIDTH, offset: ITEM_WIDTH * i, index: i })}
+          onScrollBeginDrag={() => setIsUserInteracting(true)}
+          onScrollEndDrag={() => {
+            clearTimeout(resumeTimerRef.current);
+            resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
+          }}
           decelerationRate="fast"
           contentContainerStyle={styles.bannerCarousel}
           onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / (width - 30));
+            const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
             setCurrentBannerIndex(index);
           }}
         />
@@ -621,18 +642,6 @@ function HomeScreen({ navigation }) {
         >
           <Text style={styles.viewAllButtonText}>View All Products ({PRODUCTS.length})</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Featured Products - EXACT LIKE WEBSITE */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Featured Products</Text>
-        <FlatList
-          data={products.slice(0, 6)}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item._id}
-          numColumns={2}
-          contentContainerStyle={styles.productsList}
-        />
       </View>
 
       {/* Recently Viewed Products - PERSONALIZED FOR USER */}
@@ -774,10 +783,13 @@ function ProductsScreen({ navigation, route }) {
   );
 }
 
-// Product Detail Screen - EXACT LIKE WEBSITE
+// Product Detail Screen - ENHANCED WITH "PEOPLE ALSO LIKE"
 function ProductDetailScreen({ navigation, route }) {
   const { product } = route.params;
   const { addToRecentlyViewed } = useRecentlyViewed();
+  const [suggestedProducts, setSuggestedProducts] = useState([]);
+  const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState(0);
+  const suggestionRef = useRef(null);
 
   // Add to recently viewed when component mounts
   useEffect(() => {
@@ -785,6 +797,115 @@ function ProductDetailScreen({ navigation, route }) {
       addToRecentlyViewed(product);
     }
   }, [product, addToRecentlyViewed]);
+
+  // Generate "People also like" products - mix from different categories
+  useEffect(() => {
+    const generateSuggestedProducts = () => {
+      // Mix of products from different categories
+      const mixedProducts = [
+        // Electronics
+        {
+          _id: 'suggest_1',
+          name: 'Wireless Headphones',
+          brand: 'TechSound',
+          price: 89.99,
+          discount: 15,
+          rating: 4.5,
+          stock: 25,
+          category: 'Electronics',
+          images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'],
+          description: 'Premium wireless headphones with noise cancellation'
+        },
+        // Toys
+        {
+          _id: 'suggest_2',
+          name: 'Educational Building Blocks',
+          brand: 'KidsPlay',
+          price: 34.99,
+          discount: 20,
+          rating: 4.8,
+          stock: 40,
+          category: 'Toys',
+          images: ['https://images.unsplash.com/photo-1558877385-8c1b8b6e5e8e?auto=format&fit=crop&w=800&q=80'],
+          description: 'Creative building blocks for developing minds'
+        },
+        // Home & Kitchen
+        {
+          _id: 'suggest_3',
+          name: 'Smart Coffee Maker',
+          brand: 'BrewMaster',
+          price: 129.99,
+          discount: 10,
+          rating: 4.3,
+          stock: 15,
+          category: 'Home & Kitchen',
+          images: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80'],
+          description: 'WiFi-enabled coffee maker with app control'
+        },
+        // Books
+        {
+          _id: 'suggest_4',
+          name: 'The Art of Programming',
+          brand: 'TechBooks',
+          price: 49.99,
+          discount: 25,
+          rating: 4.7,
+          stock: 30,
+          category: 'Books',
+          images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80'],
+          description: 'Comprehensive guide to modern programming'
+        },
+        // Clothing
+        {
+          _id: 'suggest_5',
+          name: 'Premium Cotton T-Shirt',
+          brand: 'ComfortWear',
+          price: 24.99,
+          discount: 30,
+          rating: 4.4,
+          stock: 50,
+          category: 'Clothing',
+          images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=80'],
+          description: 'Soft, breathable cotton t-shirt in multiple colors'
+        },
+        // Sports
+        {
+          _id: 'suggest_6',
+          name: 'Yoga Mat Pro',
+          brand: 'FitLife',
+          price: 39.99,
+          discount: 15,
+          rating: 4.6,
+          stock: 35,
+          category: 'Sports',
+          images: ['https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80'],
+          description: 'Non-slip yoga mat for all fitness levels'
+        }
+      ];
+
+      // Shuffle and select 4-5 products
+      const shuffled = mixedProducts.sort(() => 0.5 - Math.random());
+      setSuggestedProducts(shuffled.slice(0, 5));
+    };
+
+    generateSuggestedProducts();
+  }, [product]);
+
+  // Auto-scroll carousel every 4 seconds
+  useEffect(() => {
+    if (suggestedProducts.length === 0) return;
+
+    const interval = setInterval(() => {
+      const nextIndex = (currentSuggestionIndex + 1) % suggestedProducts.length;
+      suggestionRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true
+      });
+      setCurrentSuggestionIndex(nextIndex);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [currentSuggestionIndex, suggestedProducts.length]);
 
   return (
     <ScrollView style={styles.container}>
@@ -843,6 +964,64 @@ function ProductDetailScreen({ navigation, route }) {
           </View>
         </View>
       </View>
+
+      {/* People Also Like Section */}
+      {suggestedProducts.length > 0 && (
+        <View style={styles.suggestionsSection}>
+          <Text style={styles.suggestionsTitle}>People also like</Text>
+          <FlatList
+            ref={suggestionRef}
+            data={suggestedProducts}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionCard}
+                onPress={() => navigation.push('ProductDetail', { product: item })}
+              >
+                <Image source={{ uri: item.images[0] }} style={styles.suggestionImage} />
+                <View style={styles.suggestionInfo}>
+                  <Text style={styles.suggestionName} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.suggestionBrand}>{item.brand}</Text>
+                  <View style={styles.suggestionPriceContainer}>
+                    {item.discount > 0 && (
+                      <Text style={styles.suggestionOriginalPrice}>${item.price}</Text>
+                    )}
+                    <Text style={styles.suggestionPrice}>
+                      ${item.discount > 0 ? (item.price * (1 - item.discount / 100)).toFixed(2) : item.price}
+                    </Text>
+                  </View>
+                  <View style={styles.suggestionRating}>
+                    <Ionicons name="star" size={12} color="#fbbf24" />
+                    <Text style={styles.suggestionRatingText}>{item.rating}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+            keyExtractor={(item) => item._id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={width * 0.45}
+            decelerationRate="fast"
+            contentContainerStyle={styles.suggestionsCarousel}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / (width * 0.45));
+              setCurrentSuggestionIndex(index);
+            }}
+          />
+
+          {/* Dots Indicator */}
+          <View style={styles.suggestionsIndicator}>
+            {suggestedProducts.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.suggestionDot,
+                  index === currentSuggestionIndex && styles.suggestionDotActive
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -875,27 +1054,80 @@ function CartScreen({ navigation }) {
   );
 }
 
-// Profile Screen - EXACT LIKE WEBSITE
+// Profile Screen - ENHANCED WITH REAL USER DATA
 function ProfileScreen({ navigation }) {
+  const [user, setUser] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#059473" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Account</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#059473" />
-        </View>
-        <Text style={styles.userName}>Guest User</Text>
-        <Text style={styles.userEmail}>guest@example.com</Text>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
+          {user?.image ? (
+            <Image source={{ uri: user.image }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={40} color="#059473" />
+            </View>
+          )}
+          <View style={styles.editBadge}>
+            <Ionicons name="camera" size={12} color="#ffffff" />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
+        <Text style={styles.userEmail}>{user?.email || 'guest@example.com'}</Text>
       </View>
 
       <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
           <Ionicons name="person-outline" size={24} color="#059473" />
           <Text style={styles.menuText}>Edit Profile</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -903,7 +1135,7 @@ function ProfileScreen({ navigation }) {
 
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="location-outline" size={24} color="#059473" />
-          <Text style={styles.menuText}>Addresses</Text>
+          <Text style={styles.menuText}>My Addresses</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
@@ -916,6 +1148,18 @@ function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="receipt-outline" size={24} color="#059473" />
           <Text style={styles.menuText}>Order History</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <Ionicons name="settings-outline" size={24} color="#059473" />
+          <Text style={styles.menuText}>Settings</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <Ionicons name="help-circle-outline" size={24} color="#059473" />
+          <Text style={styles.menuText}>Help & Support</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
       </View>
@@ -933,14 +1177,12 @@ function MainTabs() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Products') {
-            iconName = focused ? 'grid' : 'grid-outline';
+          } else if (route.name === 'Store') {
+            iconName = focused ? 'storefront' : 'storefront-outline';
           } else if (route.name === 'Blog') {
             iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'About') {
-            iconName = focused ? 'information-circle' : 'information-circle-outline';
           } else if (route.name === 'Cart') {
-            iconName = focused ? 'cart' : 'cart-outline';
+            iconName = focused ? 'bag' : 'bag-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -961,9 +1203,8 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Products" component={ProductsScreen} />
+      <Tab.Screen name="Store" component={ProductsScreen} />
       <Tab.Screen name="Blog" component={BlogTabScreen} />
-      <Tab.Screen name="About" component={AboutScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -1800,6 +2041,11 @@ export default function App() {
             component={AboutScreen}
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </RecentlyViewedProvider>
@@ -1811,10 +2057,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  // Header Styles - EXACT LIKE EASYSHOP WEBSITE
+  // Header Styles - RESPONSIVE AND COMPACT
   headerContainer: {
     backgroundColor: '#ffffff',
-    paddingTop: 40,
+    paddingTop: 25, // Much less space above logo
   },
 
   // Top Bar Styles
@@ -1858,48 +2104,42 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // Main Header with EASYSHOP Logo
+  // Main Header with EASYSHOP Logo - EVENLY ALIGNED
   mainHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 2, // Minimal vertical spacing
     backgroundColor: '#ffffff',
+    minHeight: 44, // Smaller consistent height
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'flex-start',
+    flex: 1, // Take available space for better alignment
   },
-  logoIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#1e3a8a',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+  logoImage: {
+    width: 110, // Slightly smaller for better proportion
+    height: 36,
+    maxWidth: 110,
+    maxHeight: 36,
   },
-  logoF: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    letterSpacing: 1,
-  },
+
   headerIcons: {
     flexDirection: 'row',
-    gap: 15,
+    alignItems: 'center',
+    gap: 8, // Even tighter spacing between icons
   },
   iconButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 3, // Reduced padding for tighter spacing
+    borderRadius: 5,
     backgroundColor: '#f9fafb',
+    minWidth: 32, // Consistent button size
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Navigation Menu
@@ -1921,10 +2161,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Search Section - Clean Design
+  // Search Section - Clean Design with Better Spacing
   searchSection: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingHorizontal: 20, // Match main header padding
+    paddingVertical: 4, // Minimal spacing
     backgroundColor: '#ffffff',
     position: 'relative',
     zIndex: 1000,
@@ -2072,7 +2312,7 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
     width: '100%',
-    height: 180, // Much smaller for mobile
+    height: 260, // Even taller hero carousel images
     resizeMode: 'cover',
   },
   bannerOverlay: {
@@ -2388,6 +2628,97 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // People Also Like Styles
+  suggestionsSection: {
+    backgroundColor: '#ffffff',
+    marginTop: 20,
+    paddingVertical: 20,
+  },
+  suggestionsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  suggestionsCarousel: {
+    paddingHorizontal: 10,
+  },
+  suggestionCard: {
+    width: width * 0.4,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  suggestionImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'cover',
+  },
+  suggestionInfo: {
+    padding: 12,
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  suggestionBrand: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  suggestionPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  suggestionOriginalPrice: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+    marginRight: 6,
+  },
+  suggestionPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#059473',
+  },
+  suggestionRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  suggestionRatingText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 4,
+  },
+  suggestionsIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  suggestionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#d1d5db',
+    marginHorizontal: 4,
+  },
+  suggestionDotActive: {
+    backgroundColor: '#059473',
+    width: 20,
+  },
+
   // Login/Register Styles - EXACT LIKE WEBSITE
   form: {
     padding: 20,
@@ -2472,6 +2803,10 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     marginBottom: 20,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 15,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -2479,7 +2814,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#059473',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userName: {
     fontSize: 20,
