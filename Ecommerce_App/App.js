@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
@@ -77,30 +77,41 @@ const fetchProducts = async () => {
 
 
 
-// HERO BANNERS — curated, clickable slides
-const BANNERS = [
+// HERO BANNERS — placeholder slides used only when no campaigns exist in DB
+const PLACEHOLDER_BANNERS = [
   {
-    _id: 'sale',
+    _id: 'ph_sale',
     banner: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=2940&q=80',
-    title: 'Our Latest Deals',
     label: 'Our Latest Deals',
     action: { type: 'sale' }
   },
   {
-    _id: 'electronics',
+    _id: 'ph_electronics',
     banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2940&q=80',
-    title: 'Our Newst Electronics',
     label: 'Our Newst Electronics',
     action: { type: 'category', category: 'Electronics' }
   },
   {
-    _id: 'toys',
+    _id: 'ph_toys',
     banner: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1600&q=80',
-    title: 'Our Newst Toys',
     label: 'Our Newst Toys',
     action: { type: 'category', category: 'Toys' }
   }
 ];
+
+// Parse CTA link from dashboard campaign into a mobile action
+const parseAction = (link) => {
+  try {
+    if (!link || typeof link !== 'string') return { type: 'sale' };
+    const url = new URL(link, 'http://localhost'); // base for relative paths
+    const cat = url.searchParams.get('category');
+    if (cat) return { type: 'category', category: decodeURIComponent(cat) };
+    return { type: 'sale' };
+  } catch (e) {
+    return { type: 'sale' };
+  }
+};
+
 
 // Simple Login Screen
 function LoginScreen({ navigation }) {
@@ -158,14 +169,50 @@ function HomeScreen({ navigation }) {
   const [showCategoryDropdown, setShowCategoryDropdown] = React.useState(false);
   const [categories, setCategories] = React.useState([]);
   const [selectedCategory, setSelectedCategory] = React.useState('All Category');
+  const [searchValue, setSearchValue] = React.useState('');
   const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
 
+
+  // Mobile hero banners - loaded from backend, with placeholders when empty
+  const [banners, setBanners] = React.useState(PLACEHOLDER_BANNERS);
 
   // API-driven product selections
   const [topRatedProducts, setTopRatedProducts] = React.useState([]);
   const [discountProducts, setDiscountProducts] = React.useState([]);
   const [productsCount, setProductsCount] = React.useState(0);
   const flattenRows = (rows) => Array.isArray(rows) ? rows.flat().filter(Boolean) : [];
+
+  // Featured products rotation state (dynamic mix)
+  const [featuredPool, setFeaturedPool] = React.useState([]);
+  const [featuredProducts, setFeaturedProducts] = React.useState([]);
+
+  // Helpers
+  const dedupeById = (arr) => {
+    const seen = new Set();
+    return arr.filter((p) => {
+      const id = p?._id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
+  const pickRandom = (arr, count = 4) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a.slice(0, count);
+  };
+
+  // Rotate Featured Products every 2 minutes
+  React.useEffect(() => {
+    if (!featuredPool.length) return;
+    const update = () => setFeaturedProducts(pickRandom(featuredPool, 4));
+    update();
+    const id = setInterval(update, 120000); // 2 minutes
+    return () => clearInterval(id);
+  }, [featuredPool]);
 
   // Ensure category order is identical (alphabetical)
   const sortedCategories = React.useMemo(
@@ -184,18 +231,46 @@ function HomeScreen({ navigation }) {
     fetchProducts()
       .then(d => {
         if (!mounted) return;
-        setTopRatedProducts(flattenRows(d.topRated_product || []).slice(0, 4));
-        setDiscountProducts(flattenRows(d.discount_product || []).slice(0, 4));
+        const top = flattenRows(d.topRated_product || []);
+        const disc = flattenRows(d.discount_product || []);
+        const latest = flattenRows(d.latest_product || []);
+        setTopRatedProducts(top.slice(0, 4));
+        setDiscountProducts(disc.slice(0, 4));
+        const pool = dedupeById([...latest, ...top, ...disc]).slice(0, 40);
+        setFeaturedPool(pool);
       })
       .catch(() => {
         setTopRatedProducts([]);
         setDiscountProducts([]);
+        setFeaturedPool([]);
       });
     // Total products count for "View All" button
     fetch(`${API_BASE_URL}/home/query-products?lowPrice=0&&highPrice=100000&&pageNumber=1`)
       .then(r => r.json())
       .then(d => { if (mounted) setProductsCount(d.totalProduct || 0); })
       .catch(() => { if (mounted) setProductsCount(0); });
+    return () => { mounted = false; };
+  }, []);
+
+  // Load campaigns for mobile hero banners from backend
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/campaigns/public`);
+        const d = await r.json();
+        const mapped = (d.campaigns || []).map(c => ({
+          _id: c._id,
+          banner: c.image,
+          label: c.title,
+          action: parseAction(c.ctaLink)
+        }));
+        if (mounted) setBanners(mapped.length ? mapped : PLACEHOLDER_BANNERS);
+      } catch (_) {
+        if (mounted) setBanners(PLACEHOLDER_BANNERS);
+      }
+    };
+    load();
     return () => { mounted = false; };
   }, []);
 
@@ -222,7 +297,7 @@ function HomeScreen({ navigation }) {
     if (autoTimerRef.current) clearInterval(autoTimerRef.current);
     autoTimerRef.current = setInterval(() => {
       if (!bannerRef.current) return;
-      const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
+      const nextIndex = (currentBannerIndex + 1) % banners.length;
       bannerRef.current.scrollToIndex({ index: nextIndex, animated: true });
       setCurrentBannerIndex(nextIndex);
     }, 3500);
@@ -235,6 +310,8 @@ function HomeScreen({ navigation }) {
     <TouchableOpacity
       style={[styles.bannerContainer, { width: width - 30 }]}
       onPress={() => {
+
+
           if (item.action?.type === 'category' && item.action.category) {
             navigation.navigate({ name: 'Products', params: { category: item.action.category, fromCategory: true }, merge: true });
           } else if (item.action?.type === 'sale') {
@@ -271,7 +348,7 @@ function HomeScreen({ navigation }) {
             style={[styles.bannerArrow, styles.bannerArrowLeft]}
             onPress={() => {
               setIsUserInteracting(true);
-              const prevIndex = currentBannerIndex === 0 ? BANNERS.length - 1 : currentBannerIndex - 1;
+              const prevIndex = currentBannerIndex === 0 ? banners.length - 1 : currentBannerIndex - 1;
               bannerRef.current?.scrollToIndex({ index: prevIndex, animated: true });
               setCurrentBannerIndex(prevIndex);
               clearTimeout(resumeTimerRef.current);
@@ -285,7 +362,7 @@ function HomeScreen({ navigation }) {
             style={[styles.bannerArrow, styles.bannerArrowRight]}
             onPress={() => {
               setIsUserInteracting(true);
-              const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
+              const nextIndex = (currentBannerIndex + 1) % banners.length;
               bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
               setCurrentBannerIndex(nextIndex);
               clearTimeout(resumeTimerRef.current);
@@ -397,8 +474,18 @@ function HomeScreen({ navigation }) {
                 style={styles.searchInput}
                 placeholder="What do you need"
                 placeholderTextColor="#9ca3af"
+                value={searchValue}
+                onChangeText={setSearchValue}
+                onSubmitEditing={() =>
+                  navigation.navigate('Products', { category: selectedCategory === 'All Category' ? '' : selectedCategory, searchQuery: searchValue })
+                }
               />
-              <TouchableOpacity style={styles.searchButton}>
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={() =>
+                  navigation.navigate('Products', { category: selectedCategory === 'All Category' ? '' : selectedCategory, searchQuery: searchValue })
+                }
+              >
                 <Text style={styles.searchButtonText}>SEARCH</Text>
               </TouchableOpacity>
             </View>
@@ -412,7 +499,7 @@ function HomeScreen({ navigation }) {
       <View style={styles.heroSection}>
         <FlatList
           ref={bannerRef}
-          data={BANNERS}
+          data={banners}
           renderItem={renderBanner}
           keyExtractor={(item) => item._id}
           horizontal
@@ -435,7 +522,7 @@ function HomeScreen({ navigation }) {
 
         {/* Dots Indicator - EXACT LIKE WEBSITE */}
         <View style={styles.dotsContainer}>
-          {BANNERS.map((_, index) => (
+          {banners.map((_, index) => (
             <TouchableOpacity
               key={index}
               style={[
@@ -471,6 +558,21 @@ function HomeScreen({ navigation }) {
           <Text style={styles.viewAllButtonText}>View All Products ({productsCount})</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Featured Products - Dynamic Mix that rotates every 2 minutes */}
+      {featuredProducts.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Feature Products</Text>
+          <FlatList
+            data={featuredProducts}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item._id}
+            numColumns={2}
+            contentContainerStyle={styles.productsList}
+          />
+        </View>
+      )}
+
 
       {/* Recently Viewed Products - PERSONALIZED FOR USER */}
       {recentlyViewed.length > 0 && (
@@ -538,6 +640,7 @@ function HomeScreen({ navigation }) {
 // Products Screen - EXACT LIKE WEBSITE
 function ProductsScreen({ navigation, route }) {
   const { category } = route.params || {};
+  const searchQuery = route.params?.searchQuery || '';
   const { addToRecentlyViewed } = useRecentlyViewed();
 
   // API-driven Products Screen with pagination (loads all)
@@ -551,7 +654,7 @@ function ProductsScreen({ navigation, route }) {
   const fetchPage = React.useCallback(async (page, reset=false) => {
     try {
       if (reset) setLoading(true); else setLoadingMore(true);
-      const qs = `category=${encodeURIComponent(category || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}`;
+      const qs = `category=${encodeURIComponent(category || '')}&&searchValue=${encodeURIComponent(searchQuery || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}`;
       const r = await fetch(`${API_BASE_URL}/home/query-products?${qs}`);
       const d = await r.json();
       const live = Array.isArray(d.products) ? d.products : [];
@@ -564,7 +667,7 @@ function ProductsScreen({ navigation, route }) {
     } finally {
       if (reset) setLoading(false); else setLoadingMore(false);
     }
-  }, [category, parPage]);
+  }, [category, parPage, searchQuery]);
 
   React.useEffect(() => {
     // reset on category change

@@ -8,6 +8,8 @@ import {
   Dimensions,
 } from 'react-native';
 
+import api from '../api/api';
+
 const { width } = Dimensions.get('window');
 
 const SLIDES = [
@@ -31,18 +33,55 @@ const SLIDES = [
   }
 ];
 
+const parseAction = (link) => {
+  if (!link) return { type: 'sale' };
+  try {
+    // expect like '/products?category=Electronics'
+    if (link.startsWith('/products?')) {
+      const query = link.split('?')[1] || '';
+      const params = Object.fromEntries(query.split('&').map(x=>x.split('=')));
+      if (params.category) return { type: 'category', category: decodeURIComponent(params.category) };
+      return { type: 'sale' };
+    }
+  } catch(e) {}
+  return { type: 'sale' };
+};
+
 export default function Banner({ navigation }) {
   const listRef = useRef(null);
   const [index, setIndex] = useState(0);
+  const [slides, setSlides] = useState(SLIDES);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const { data } = await api.get('/campaigns/public');
+        const mapped = (data?.campaigns || []).map(c => ({
+          id: c._id,
+          image: c.image,
+          title: c.title,
+          textColor: c.textColor || '#ffffff',
+          titleSize: c.titleSize || 32,
+          action: parseAction(c.ctaLink)
+        }));
+        if (mounted && mapped.length) setSlides(mapped);
+      } catch (_) {
+        // fallback stays as default SLIDES
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => {
-      const next = (index + 1) % SLIDES.length;
+      const next = (index + 1) % slides.length;
       listRef.current?.scrollToIndex({ index: next, animated: true });
       setIndex(next);
     }, 3000);
     return () => clearInterval(t);
-  }, [index]);
+  }, [index, slides.length]);
 
   const onPressSlide = (slide) => {
     if (!navigation) return;
@@ -70,7 +109,7 @@ export default function Banner({ navigation }) {
       <View style={styles.carouselWrapper}>
         <FlatList
           ref={listRef}
-          data={SLIDES}
+          data={slides}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           horizontal
