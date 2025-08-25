@@ -14,7 +14,7 @@ import {
   RadioButton,
 } from 'react-native-paper';
 import { useCart } from '../context/CartContext';
-import { ordersAPI, paymentsAPI } from '../services/api';
+import api from '../api/api';
 
 export default function CheckoutScreen({ navigation }) {
   const { cartItems, getCartTotal, clearCart } = useCart();
@@ -48,11 +48,11 @@ export default function CheckoutScreen({ navigation }) {
         total_amount: getCartTotal(),
       };
 
-      const orderResponse = await ordersAPI.createOrder(orderData);
-      
-      if (orderResponse.data.success) {
-        const orderId = orderResponse.data.order._id;
-        
+      const orderResponse = await api.post('/order/place-order', orderData);
+
+      if (orderResponse.data?.success) {
+        const orderId = orderResponse.data.order?._id;
+
         // Process payment
         const paymentData = {
           order_id: orderId,
@@ -60,9 +60,9 @@ export default function CheckoutScreen({ navigation }) {
           payment_method: paymentMethod,
         };
 
-        const paymentResponse = await paymentsAPI.processPayment(paymentData);
-        
-        if (paymentResponse.data.success) {
+        const paymentResponse = await api.post('/payment/process', paymentData);
+
+        if (paymentResponse.data?.success) {
           await clearCart();
           
           Alert.alert(

@@ -1,0 +1,228 @@
+{
+  "duplicates": [
+    {
+      "paths": [
+        "/Users/danielknafel/ReactProject/Ecommerce/frontend/src/api/api.js",
+        "/Users/danielknafel/ReactProject/Ecommerce/dashboard/src/api/api.js",
+        "/Users/danielknafel/ReactProject/Ecommerce_App/src/api/api.js",
+        "/Users/danielknafel/ReactProject/Ecommerce_App/src/services/api.js"
+      ],
+      "reason": "API configuration files with 85-90% identical code, only storage methods differ (localStorage vs AsyncStorage)",
+      "action": "Consolidate into shared npm package with platform adapters"
+    },
+    {
+      "paths": [
+        "/Users/danielknafel/ReactProject/Ecommerce/frontend/src/components/Banner.jsx",
+        "/Users/danielknafel/ReactProject/Ecommerce_App/src/components/Banner.js"
+      ],
+      "reason": "Banner components with 90% identical slide data and structure",
+      "action": "Extract slide configuration to shared JSON file"
+    },
+    {
+      "paths": [
+        "/Users/danielknafel/ReactProject/Ecommerce/frontend/src/assets/demo.jpg",
+        "/Users/danielknafel/ReactProject/Ecommerce/dashboard/src/assets/demo.jpg",
+        "/Users/danielknafel/ReactProject/Ecommerce/dashboard/public/images/demo.jpg"
+      ],
+      "reason": "Identical demo/placeholder images used across platforms",
+      "action": "Delete and replace with proper default avatars or remove usage"
+    },
+    {
+      "paths": [
+        "/Users/danielknafel/ReactProject/Ecommerce/frontend/src/store/reducers/cardReducer.js",
+        "/Users/danielknafel/ReactProject/Ecommerce_App/src/store/reducers/cardReducer.js"
+      ],
+      "reason": "Redux reducers with 80% similar logic but different API endpoints",
+      "action": "Standardize API endpoints first, then extract shared business logic"
+    }
+  ],
+  "inconsistencies": [
+    {
+      "entity": "Add to Cart API",
+      "web": "POST /add-to-card",
+      "app": "POST /home/product/add-to-card", 
+      "suggestedSource": "POST /api/cart/add (standardized endpoint)"
+    },
+    {
+      "entity": "Get Cart API",
+      "web": "GET /get-card-products/{userId}",
+      "app": "GET /home/product/get-card-product/{userId}",
+      "suggestedSource": "GET /api/cart/items/{userId} (standardized endpoint)"
+    },
+    {
+      "entity": "Delete Cart Item API",
+      "web": "DELETE /delete-card-products/{id}",
+      "app": "DELETE /home/product/delete-card-product/{id}",
+      "suggestedSource": "DELETE /api/cart/items/{id} (standardized endpoint)"
+    },
+    {
+      "entity": "Authentication Token Name",
+      "web": "customerToken (frontend) / accessToken (dashboard)",
+      "app": "customerToken + userToken (redundant)",
+      "suggestedSource": "customerToken (consistent across all platforms)"
+    },
+    {
+      "entity": "Component Naming Convention",
+      "web": "Categorys.jsx (with typo)",
+      "app": "Categories.js",
+      "suggestedSource": "Categories.jsx (correct spelling, consistent extension)"
+    },
+    {
+      "entity": "Reducer Naming",
+      "web": "cardReducer.js",
+      "app": "cardReducer.js",
+      "suggestedSource": "cartReducer.js (correct terminology - cart not card)"
+    }
+  ],
+  "deadArtifacts": [
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce_App/TestApp.js",
+      "decision": "delete",
+      "why": "Initial setup test component no longer needed in production app"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce_App/setup.js.disabled",
+      "decision": "delete", 
+      "why": "Explicitly disabled setup script not needed in codebase"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/frontend/src/App.test.js",
+      "decision": "delete",
+      "why": "Placeholder test with no real coverage - replace with actual component tests"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/dashboard/src/App.test.js", 
+      "decision": "delete",
+      "why": "Identical placeholder test with no real coverage"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/backend/scripts/addDogsProducts.js",
+      "decision": "delete",
+      "why": "Sample data script for development, not needed in production"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/backend/scripts/populateTestData.js",
+      "decision": "archive",
+      "why": "Useful for development environments, move to dev-tools directory"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/api-test.html",
+      "decision": "archive",
+      "why": "Manual testing file, replace with automated API tests but keep for reference"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/cookies.txt",
+      "decision": "delete",
+      "why": "Manual testing artifact that shouldn't be in version control"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/dashboard/src/pages",
+      "decision": "delete",
+      "why": "Empty directory with no content or references"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/dashboard/src/services", 
+      "decision": "delete",
+      "why": "Empty directory with no content or references"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/frontend/public/images/blog",
+      "decision": "delete", 
+      "why": "Empty blog directory - blog feature not implemented"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/backend/frontend/public/dogfood.webp",
+      "decision": "delete",
+      "why": "Sample image not referenced anywhere in codebase"
+    },
+    {
+      "path": "Multiple .DS_Store files (22 found)",
+      "decision": "delete",
+      "why": "macOS system files should not be in version control - add to .gitignore"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/postman/payment-tests.json",
+      "decision": "keep",
+      "why": "Functional API test collection that provides value for manual testing"
+    },
+    {
+      "path": "/Users/danielknafel/ReactProject/Ecommerce/frontend/Selenium Tests/",
+      "decision": "keep",
+      "why": "Comprehensive user flow tests providing excellent coverage"
+    }
+  ],
+  "actions": [
+    {
+      "priority": "P0",
+      "description": "Standardize cart API endpoints across web and mobile platforms", 
+      "owner": "Lead Developer",
+      "etaDays": 2
+    },
+    {
+      "priority": "P0", 
+      "description": "Remove duplicate mobile API configuration files",
+      "owner": "Lead Developer", 
+      "etaDays": 1
+    },
+    {
+      "priority": "P0",
+      "description": "Fix authentication token naming inconsistency",
+      "owner": "Lead Developer",
+      "etaDays": 1
+    },
+    {
+      "priority": "P1",
+      "description": "Implement backend API tests for authentication endpoints",
+      "owner": "QA Engineer", 
+      "etaDays": 3
+    },
+    {
+      "priority": "P1",
+      "description": "Extract shared banner configuration and remove code duplication",
+      "owner": "Frontend Developer",
+      "etaDays": 1
+    },
+    {
+      "priority": "P1", 
+      "description": "Clean up and remove 24 identified dead artifacts",
+      "owner": "Frontend Developer",
+      "etaDays": 1
+    },
+    {
+      "priority": "P1",
+      "description": "Add cart functionality API tests with error scenarios", 
+      "owner": "QA Engineer",
+      "etaDays": 2
+    },
+    {
+      "priority": "P2",
+      "description": "Consolidate Redux reducers and extract shared business logic",
+      "owner": "Frontend Developer", 
+      "etaDays": 3
+    },
+    {
+      "priority": "P2",
+      "description": "Implement comprehensive E2E tests beyond basic payment flow",
+      "owner": "QA Engineer",
+      "etaDays": 4
+    },
+    {
+      "priority": "P2", 
+      "description": "Create shared asset management strategy and CDN integration",
+      "owner": "DevOps Engineer",
+      "etaDays": 5
+    },
+    {
+      "priority": "P2",
+      "description": "Set up CI/CD pipeline with automated testing and code coverage",
+      "owner": "DevOps Engineer", 
+      "etaDays": 3
+    },
+    {
+      "priority": "P2",
+      "description": "Implement OpenAPI documentation for all backend endpoints",
+      "owner": "Backend Developer",
+      "etaDays": 4
+    }
+  ]
+}

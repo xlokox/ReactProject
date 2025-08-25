@@ -1,9 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Base URL - Update this to match your backend server IP
-// Replace 'localhost' with your computer's IP address for mobile testing
-const BASE_URL = 'http://YOUR_ACTUAL_IP:5001/api'; // Replace YOUR_ACTUAL_IP with your computer's IP
+// Base URL from Expo config (app.config.js -> extra.apiUrl)
+import Constants from 'expo-constants';
+const BASE_URL = Constants?.expoConfig?.extra?.apiUrl || 'http://localhost:5001/api';
 
 // Create axios instance with enhanced configuration
 const api = axios.create({

@@ -15,53 +15,67 @@ import {
   ActivityIndicator,
   Chip,
 } from 'react-native-paper';
-import { productsAPI } from '../services/api';
+import api from '../api/api';
 import { useCart } from '../context/CartContext';
+import getProductImageSource from '../utils/image';
+
 
 export default function ProductsScreen({ navigation, route }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState(route.params?.searchQuery || '');
   const [selectedCategory, setSelectedCategory] = useState(route.params?.category || '');
   const [categories, setCategories] = useState([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalProduct, setTotalProduct] = useState(0);
+  const [parPage, setParPage] = useState(12);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    loadProducts();
+    // Reset and load first page when filters change
+    setProducts([]);
+    setPageNumber(1);
+    loadProducts({ reset: true, nextPage: 1 });
     loadCategories();
   }, [searchQuery, selectedCategory]);
 
-  const loadProducts = async () => {
+  const buildQueryString = (page) => {
+    const qs = new URLSearchParams({
+      category: selectedCategory || '',
+      searchValue: searchQuery || '',
+      lowPrice: '0',
+      highPrice: '100000',
+      pageNumber: String(page),
+      parPage: String(parPage)
+    }).toString();
+    return qs;
+  };
+
+  const loadProducts = async ({ reset = false, nextPage = 1 } = {}) => {
     try {
-      setLoading(true);
-      const params = {};
-      
-      if (searchQuery) {
-        const response = await productsAPI.searchProducts(searchQuery);
-        if (response.data.success) {
-          setProducts(response.data.products);
-        }
-      } else {
-        if (selectedCategory) {
-          params.category = selectedCategory;
-        }
-        const response = await productsAPI.getProducts(params);
-        if (response.data.success) {
-          setProducts(response.data.products);
-        }
-      }
+      if (reset) setLoading(true); else setLoadingMore(true);
+      const qs = buildQueryString(nextPage);
+      const response = await api.get(`/home/query-products?${qs}`);
+      const list = Array.isArray(response.data?.products) ? response.data.products : [];
+      const total = response.data?.totalProduct || 0;
+      const per = response.data?.parPage || parPage;
+      setTotalProduct(total);
+      setParPage(per);
+      setProducts(prev => (reset ? list : [...prev, ...list]));
+      setPageNumber(nextPage);
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
-      setLoading(false);
+      if (reset) setLoading(false); else setLoadingMore(false);
     }
   };
 
   const loadCategories = async () => {
     try {
-      const response = await productsAPI.getCategories();
-      if (response.data.success) {
-        setCategories(response.data.categories);
+      const response = await api.get('/home/get-categorys');
+      if (response.data?.categorys) {
+        setCategories(response.data.categorys);
       }
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -80,9 +94,7 @@ export default function ProductsScreen({ navigation, route }) {
     >
       <Card style={styles.card}>
         <Image
-          source={{ 
-            uri: item.images?.[0] || 'https://via.placeholder.com/200x200' 
-          }}
+          source={getProductImageSource(item)}
           style={styles.productImage}
           resizeMode="cover"
         />
@@ -152,6 +164,18 @@ export default function ProductsScreen({ navigation, route }) {
           numColumns={2}
           contentContainerStyle={styles.productsList}
           showsVerticalScrollIndicator={false}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            const loaded = products.length;
+            if (!loadingMore && loaded < totalProduct) {
+              loadProducts({ nextPage: pageNumber + 1 });
+            }
+          }}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color="#2196F3" />
+            </View>
+          ) : null}
         />
       )}
     </View>

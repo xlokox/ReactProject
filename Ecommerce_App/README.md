@@ -64,10 +64,12 @@ npm install
 ```
 
 ### 3. **Update API Configuration:**
-Edit `src/api/api.js` and `src/services/socketService.js`:
-```javascript
-const BASE_URL = 'http://YOUR_IP_ADDRESS:5001/api';
+Create `.env` in Ecommerce_App based on `.env.example` and set:
 ```
+API_BASE_URL=http://YOUR_LAN_IP:5001
+SOCKET_URL=http://YOUR_LAN_IP:5001
+```
+Expo will inject these to `extra.apiUrl` and `extra.socketUrl`.
 
 **Get your IP address:**
 - **Windows:** `ipconfig`
@@ -151,8 +153,8 @@ Ecommerce_App/
 The app uses the **exact same API endpoints** as your website:
 
 ### **Authentication:**
-- `POST /customer/customer-login`
-- `POST /customer/customer-register`
+- `POST /customer/login`
+- `POST /customer/register`
 
 ### **Products:**
 - `GET /home/get-products`

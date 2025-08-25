@@ -4,15 +4,43 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import getProductImageSource from './src/utils/image';
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
+const ITEM_WIDTH = width - 30;
 
-// API BASE URL - CONNECT TO YOUR BACKEND
-const API_BASE_URL = 'http://172.20.10.6:5001/api';
+// API BASE URL - prefer env; derive device-reachable fallback in dev
+import Constants from 'expo-constants';
+
+const resolveApiBaseUrl = () => {
+
+  const cfg = Constants?.expoConfig?.extra?.apiUrl;
+  // If env config is set and not localhost, use it
+  if (cfg && !/localhost|127\.0\.0\.1/i.test(cfg)) return cfg;
+
+  // Try to derive LAN IP from Expo hostUri (works when using 'LAN' in Expo)
+  const hostUri = (Constants?.expoConfig?.hostUri || Constants?.expoGoConfig?.hostUri || '').toString();
+  const host = hostUri.split(':')[0];
+  const isIp = /^[0-9.]+$/.test(host);
+  if (isIp) return `http://${host}:5001/api`;
+
+  // Fallback to configured value or localhost (simulator only)
+  return cfg || 'http://localhost:5001/api';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+console.log('API_BASE_URL ->', API_BASE_URL);
+
+
+// Image helpers: safe product image selection with placeholder fallback
+// DEPRECATED: image helpers moved to src/utils/image.js
 
 // API FUNCTIONS - FETCH REAL DATA FROM YOUR BACKEND
 const fetchCategories = async () => {
@@ -47,267 +75,43 @@ const fetchProducts = async () => {
   }
 };
 
-// EXACT CATEGORIES FROM YOUR BACKEND - MATCHING FRONTEND
-const CATEGORIES = [
-  { _id: '1', name: 'Electronics', slug: 'electronics', image: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '2', name: 'Clothing', slug: 'clothing', image: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '3', name: 'Home & Kitchen', slug: 'home-kitchen', image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '4', name: 'Books', slug: 'books', image: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3' },
-  { _id: '5', name: 'Toys', slug: 'toys', image: 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?q=80&w=2928&auto=format&fit=crop&ixlib=rb-4.0.3' }
-];
 
-// COMPREHENSIVE PRODUCTS - EXACT MATCH WITH BACKEND (40 PRODUCTS)
-const PRODUCTS = [
-  // ELECTRONICS CATEGORY (8 products)
-  {
-    _id: '1', name: 'iPhone 15 Pro', slug: 'iphone-15-pro', category: 'Electronics', brand: 'Apple', price: 999, stock: 50, discount: 5,
-    description: 'Latest iPhone with titanium design and A17 Pro chip', shopName: 'Tech Store', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=2942&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '2', name: 'Samsung Galaxy S24', slug: 'samsung-galaxy-s24', category: 'Electronics', brand: 'Samsung', price: 899, stock: 45, discount: 8,
-    description: 'Flagship Android phone with AI features', shopName: 'Tech Store', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '3', name: 'MacBook Pro M3', slug: 'macbook-pro-m3', category: 'Electronics', brand: 'Apple', price: 1999, stock: 25, discount: 10,
-    description: 'Professional laptop with M3 chip for creators', shopName: 'Tech Store', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=2942&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '4', name: 'Dell XPS 13', slug: 'dell-xps-13', category: 'Electronics', brand: 'Dell', price: 1299, stock: 30, discount: 15,
-    description: 'Ultrabook with Intel Core i7 and premium design', shopName: 'Tech Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1531297484001-80022131f5a1?q=80&w=2920&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '5', name: 'Sony WH-1000XM5', slug: 'sony-wh-1000xm5', category: 'Electronics', brand: 'Sony', price: 399, stock: 60, discount: 12,
-    description: 'Premium noise-canceling wireless headphones', shopName: 'Audio Pro', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1546435770-a3e426bf472b?q=80&w=2865&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '6', name: 'Apple Watch Series 9', slug: 'apple-watch-series-9', category: 'Electronics', brand: 'Apple', price: 429, stock: 40, discount: 7,
-    description: 'Advanced smartwatch with health monitoring', shopName: 'Tech Store', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1579586337278-3befd40fd17a?q=80&w=2872&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '7', name: 'iPad Air', slug: 'ipad-air', category: 'Electronics', brand: 'Apple', price: 599, stock: 35, discount: 6,
-    description: 'Powerful tablet for work and creativity', shopName: 'Tech Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '8', name: 'Gaming Console', slug: 'gaming-console', category: 'Electronics', brand: 'Sony', price: 499, stock: 20, discount: 0,
-    description: 'Next-gen gaming console with 4K graphics', shopName: 'Gaming Zone', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
 
-  // CLOTHING CATEGORY (8 products)
+// HERO BANNERS — placeholder slides used only when no campaigns exist in DB
+const PLACEHOLDER_BANNERS = [
   {
-    _id: '9', name: 'Premium Cotton T-Shirt', slug: 'premium-cotton-tshirt', category: 'Clothing', brand: 'Nike', price: 29.99, stock: 100, discount: 5,
-    description: 'Comfortable cotton t-shirt for everyday wear', shopName: 'Fashion Hub', rating: 4.2,
-    images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=2880&auto=format&fit=crop&ixlib=rb-4.0.3']
+    _id: 'ph_sale',
+    banner: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=2940&q=80',
+    label: 'Our Latest Deals',
+    action: { type: 'sale' }
   },
   {
-    _id: '10', name: 'Elegant Summer Dress', slug: 'elegant-summer-dress', category: 'Clothing', brand: 'Zara', price: 79.99, stock: 80, discount: 15,
-    description: 'Beautiful summer dress for special occasions', shopName: 'Fashion Hub', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
+    _id: 'ph_electronics',
+    banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=2940&q=80',
+    label: 'Our Newst Electronics',
+    action: { type: 'category', category: 'Electronics' }
   },
   {
-    _id: '11', name: 'Running Sneakers', slug: 'running-sneakers', category: 'Clothing', brand: 'Adidas', price: 129.99, stock: 70, discount: 20,
-    description: 'High-performance running shoes with boost technology', shopName: 'Sports World', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=2912&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '12', name: 'Denim Jeans', slug: 'denim-jeans', category: 'Clothing', brand: 'Levis', price: 89.99, stock: 90, discount: 10,
-    description: 'Classic denim jeans with perfect fit', shopName: 'Fashion Hub', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=2926&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '13', name: 'Winter Jacket', slug: 'winter-jacket', category: 'Clothing', brand: 'North Face', price: 199.99, stock: 40, discount: 25,
-    description: 'Warm winter jacket for cold weather', shopName: 'Outdoor Gear', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '14', name: 'Business Shirt', slug: 'business-shirt', category: 'Clothing', brand: 'Hugo Boss', price: 119.99, stock: 60, discount: 8,
-    description: 'Professional business shirt for office wear', shopName: 'Business Attire', rating: 4.3,
-    images: ['https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '15', name: 'Sports Hoodie', slug: 'sports-hoodie', category: 'Clothing', brand: 'Under Armour', price: 69.99, stock: 85, discount: 12,
-    description: 'Comfortable hoodie for sports and casual wear', shopName: 'Sports World', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '16', name: 'Formal Shoes', slug: 'formal-shoes', category: 'Clothing', brand: 'Clarks', price: 149.99, stock: 50, discount: 18,
-    description: 'Elegant formal shoes for business occasions', shopName: 'Shoe Store', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // HOME & KITCHEN CATEGORY (8 products)
-  {
-    _id: '17', name: 'Smart Coffee Maker', slug: 'smart-coffee-maker', category: 'Home & Kitchen', brand: 'Breville', price: 299.99, stock: 35, discount: 18,
-    description: 'WiFi-enabled coffee maker with app control', shopName: 'Home Essentials', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '18', name: 'Air Fryer', slug: 'air-fryer', category: 'Home & Kitchen', brand: 'Ninja', price: 149.99, stock: 45, discount: 22,
-    description: 'Healthy cooking with hot air circulation', shopName: 'Kitchen Pro', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1585515656643-1e4d1d6d8c8b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '19', name: 'Blender', slug: 'blender', category: 'Home & Kitchen', brand: 'Vitamix', price: 399.99, stock: 25, discount: 15,
-    description: 'Professional-grade blender for smoothies and more', shopName: 'Kitchen Pro', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1570197788417-0e82375c9371?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '20', name: 'Non-Stick Pan Set', slug: 'non-stick-pan-set', category: 'Home & Kitchen', brand: 'Tefal', price: 89.99, stock: 60, discount: 12,
-    description: 'Complete set of non-stick cooking pans', shopName: 'Kitchen Essentials', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '21', name: 'Microwave Oven', slug: 'microwave-oven', category: 'Home & Kitchen', brand: 'Panasonic', price: 199.99, stock: 30, discount: 10,
-    description: 'Compact microwave with multiple cooking modes', shopName: 'Home Appliances', rating: 4.3,
-    images: ['https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '22', name: 'Knife Set', slug: 'knife-set', category: 'Home & Kitchen', brand: 'Wusthof', price: 249.99, stock: 40, discount: 20,
-    description: 'Professional chef knife set with wooden block', shopName: 'Kitchen Pro', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1593618998160-e34014e67546?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '23', name: 'Rice Cooker', slug: 'rice-cooker', category: 'Home & Kitchen', brand: 'Zojirushi', price: 179.99, stock: 35, discount: 8,
-    description: 'Smart rice cooker with fuzzy logic technology', shopName: 'Kitchen Essentials', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '24', name: 'Stand Mixer', slug: 'stand-mixer', category: 'Home & Kitchen', brand: 'KitchenAid', price: 349.99, stock: 20, discount: 25,
-    description: 'Professional stand mixer for baking enthusiasts', shopName: 'Baking Supplies', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // BOOKS CATEGORY (8 products)
-  {
-    _id: '25', name: 'The Great Novel', slug: 'the-great-novel', category: 'Books', brand: 'Penguin', price: 24.99, stock: 200, discount: 0,
-    description: 'Bestselling fiction novel that captivates readers', shopName: 'Book World', rating: 4.9,
-    images: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=2787&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '26', name: 'Business Strategy Guide', slug: 'business-strategy-guide', category: 'Books', brand: 'Harvard Business', price: 34.99, stock: 150, discount: 5,
-    description: 'Comprehensive guide to modern business strategies', shopName: 'Book World', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=2798&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '27', name: 'Cooking Masterclass', slug: 'cooking-masterclass', category: 'Books', brand: 'Gordon Ramsay', price: 29.99, stock: 100, discount: 10,
-    description: 'Learn professional cooking techniques from the master', shopName: 'Culinary Books', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '28', name: 'Science Fiction Epic', slug: 'science-fiction-epic', category: 'Books', brand: 'Orbit Books', price: 19.99, stock: 180, discount: 8,
-    description: 'Epic space adventure that spans galaxies', shopName: 'Sci-Fi Corner', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '29', name: 'Self-Help Guide', slug: 'self-help-guide', category: 'Books', brand: 'Random House', price: 22.99, stock: 120, discount: 12,
-    description: 'Transform your life with proven strategies', shopName: 'Personal Development', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '30', name: 'History Chronicles', slug: 'history-chronicles', category: 'Books', brand: 'Oxford Press', price: 39.99, stock: 80, discount: 15,
-    description: 'Comprehensive history of ancient civilizations', shopName: 'Academic Books', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '31', name: 'Programming Fundamentals', slug: 'programming-fundamentals', category: 'Books', brand: 'Tech Publications', price: 49.99, stock: 90, discount: 20,
-    description: 'Learn programming from basics to advanced concepts', shopName: 'Tech Books', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '32', name: 'Art & Design Inspiration', slug: 'art-design-inspiration', category: 'Books', brand: 'Creative Press', price: 32.99, stock: 70, discount: 6,
-    description: 'Beautiful collection of modern art and design', shopName: 'Art Books', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-
-  // TOYS CATEGORY (8 products)
-  {
-    _id: '33', name: 'Remote Control Drone', slug: 'remote-control-drone', category: 'Toys', brand: 'DJI', price: 199.99, stock: 45, discount: 15,
-    description: 'High-tech drone for outdoor adventures', shopName: 'Toy Land', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '34', name: 'LEGO Architecture Set', slug: 'lego-architecture-set', category: 'Toys', brand: 'LEGO', price: 89.99, stock: 60, discount: 10,
-    description: 'Build famous landmarks with detailed LEGO sets', shopName: 'Building Blocks', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '35', name: 'Board Game Collection', slug: 'board-game-collection', category: 'Toys', brand: 'Hasbro', price: 49.99, stock: 85, discount: 12,
-    description: 'Classic board games for family entertainment', shopName: 'Game Central', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?q=80&w=2831&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '36', name: 'Action Figure Set', slug: 'action-figure-set', category: 'Toys', brand: 'Marvel', price: 34.99, stock: 100, discount: 8,
-    description: 'Collectible superhero action figures', shopName: 'Hero Toys', rating: 4.4,
-    images: ['https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '37', name: 'Educational Puzzle', slug: 'educational-puzzle', category: 'Toys', brand: 'Ravensburger', price: 24.99, stock: 120, discount: 5,
-    description: 'Educational jigsaw puzzle for learning and fun', shopName: 'Learning Toys', rating: 4.6,
-    images: ['https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '38', name: 'RC Racing Car', slug: 'rc-racing-car', category: 'Toys', brand: 'Hot Wheels', price: 79.99, stock: 55, discount: 18,
-    description: 'High-speed remote control racing car', shopName: 'Speed Toys', rating: 4.7,
-    images: ['https://images.unsplash.com/photo-1594787318286-3d835c1d207f?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '39', name: 'Dollhouse Playset', slug: 'dollhouse-playset', category: 'Toys', brand: 'Barbie', price: 129.99, stock: 40, discount: 22,
-    description: 'Complete dollhouse with furniture and accessories', shopName: 'Doll World', rating: 4.5,
-    images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
-  },
-  {
-    _id: '40', name: 'Science Experiment Kit', slug: 'science-experiment-kit', category: 'Toys', brand: 'National Geographic', price: 59.99, stock: 70, discount: 14,
-    description: 'Hands-on science experiments for curious minds', shopName: 'STEM Toys', rating: 4.8,
-    images: ['https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3']
+    _id: 'ph_toys',
+    banner: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1600&q=80',
+    label: 'Our Newst Toys',
+    action: { type: 'category', category: 'Toys' }
   }
 ];
 
-// EXACT BANNERS FROM YOUR WEBSITE - SAME AS FRONTEND
-const BANNERS = [
-  {
-    _id: '1',
-    banner: 'http://localhost:3000/images/banner/1.jpg',
-    link: '/product/details/smartphone',
-    title: 'Shop Banner 1'
-  },
-  {
-    _id: '2',
-    banner: 'http://localhost:3000/images/banner/2.jpg',
-    link: '/product/details/laptop',
-    title: 'Shop Banner 2'
-  },
-  {
-    _id: '3',
-    banner: 'http://localhost:3000/images/banner/3.jpg',
-    link: '/product/details/t-shirt',
-    title: 'Shop Banner 3'
-  },
-  {
-    _id: '4',
-    banner: 'http://localhost:3000/images/banner/4.jpg',
-    link: '/product/details/coffee-maker',
-    title: 'Shop Banner 4'
-  },
-  {
-    _id: '5',
-    banner: 'http://localhost:3000/images/banner/5.jpg',
-    link: '/product/details/novel',
-    title: 'Shop Banner 5'
-  },
-  {
-    _id: '6',
-    banner: 'http://localhost:3000/images/banner/6.jpg',
-    link: '/product/details/toy-car',
-    title: 'Shop Banner 6'
+// Parse CTA link from dashboard campaign into a mobile action
+const parseAction = (link) => {
+  try {
+    if (!link || typeof link !== 'string') return { type: 'sale' };
+    const url = new URL(link, 'http://localhost'); // base for relative paths
+    const cat = url.searchParams.get('category');
+    if (cat) return { type: 'category', category: decodeURIComponent(cat) };
+    return { type: 'sale' };
+  } catch (e) {
+    return { type: 'sale' };
   }
-];
+};
+
 
 // Simple Login Screen
 function LoginScreen({ navigation }) {
@@ -365,17 +169,109 @@ function HomeScreen({ navigation }) {
   const [showCategoryDropdown, setShowCategoryDropdown] = React.useState(false);
   const [categories, setCategories] = React.useState([]);
   const [selectedCategory, setSelectedCategory] = React.useState('All Category');
+  const [searchValue, setSearchValue] = React.useState('');
   const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
 
-  // USE HARDCODED DATA FOR NOW - WORKING PERFECTLY
-  const categoriesData = CATEGORIES;
-  const products = PRODUCTS;
-  const topRatedProducts = PRODUCTS.filter(p => p.rating >= 4.5); // Top rated
-  const discountProducts = PRODUCTS.filter(p => p.discount > 0); // Products with discount
 
-  // Load categories on component mount
+  // Mobile hero banners - loaded from backend, with placeholders when empty
+  const [banners, setBanners] = React.useState(PLACEHOLDER_BANNERS);
+
+  // API-driven product selections
+  const [topRatedProducts, setTopRatedProducts] = React.useState([]);
+  const [discountProducts, setDiscountProducts] = React.useState([]);
+  const [productsCount, setProductsCount] = React.useState(0);
+  const flattenRows = (rows) => Array.isArray(rows) ? rows.flat().filter(Boolean) : [];
+
+  // Featured products rotation state (dynamic mix)
+  const [featuredPool, setFeaturedPool] = React.useState([]);
+  const [featuredProducts, setFeaturedProducts] = React.useState([]);
+
+  // Helpers
+  const dedupeById = (arr) => {
+    const seen = new Set();
+    return arr.filter((p) => {
+      const id = p?._id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
+  const pickRandom = (arr, count = 4) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a.slice(0, count);
+  };
+
+  // Rotate Featured Products every 2 minutes
   React.useEffect(() => {
-    setCategories(categoriesData);
+    if (!featuredPool.length) return;
+    const update = () => setFeaturedProducts(pickRandom(featuredPool, 4));
+    update();
+    const id = setInterval(update, 120000); // 2 minutes
+    return () => clearInterval(id);
+  }, [featuredPool]);
+
+  // Ensure category order is identical (alphabetical)
+  const sortedCategories = React.useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories]
+  );
+
+  // Load live categories and product summaries from backend
+  React.useEffect(() => {
+    let mounted = true;
+    // Categories
+    fetchCategories()
+      .then(list => { if (mounted) setCategories(list || []); })
+      .catch(() => { if (mounted) setCategories([]); });
+    // Products summary for home sections
+    fetchProducts()
+      .then(d => {
+        if (!mounted) return;
+        const top = flattenRows(d.topRated_product || []);
+        const disc = flattenRows(d.discount_product || []);
+        const latest = flattenRows(d.latest_product || []);
+        setTopRatedProducts(top.slice(0, 4));
+        setDiscountProducts(disc.slice(0, 4));
+        const pool = dedupeById([...latest, ...top, ...disc]).slice(0, 40);
+        setFeaturedPool(pool);
+      })
+      .catch(() => {
+        setTopRatedProducts([]);
+        setDiscountProducts([]);
+        setFeaturedPool([]);
+      });
+    // Total products count for "View All" button
+    fetch(`${API_BASE_URL}/home/query-products?lowPrice=0&&highPrice=100000&&pageNumber=1`)
+      .then(r => r.json())
+      .then(d => { if (mounted) setProductsCount(d.totalProduct || 0); })
+      .catch(() => { if (mounted) setProductsCount(0); });
+    return () => { mounted = false; };
+  }, []);
+
+  // Load campaigns for mobile hero banners from backend
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/campaigns/public`);
+        const d = await r.json();
+        const mapped = (d.campaigns || []).map(c => ({
+          _id: c._id,
+          banner: c.image,
+          label: c.title,
+          action: parseAction(c.ctaLink)
+        }));
+        if (mounted) setBanners(mapped.length ? mapped : PLACEHOLDER_BANNERS);
+      } catch (_) {
+        if (mounted) setBanners(PLACEHOLDER_BANNERS);
+      }
+    };
+    load();
+    return () => { mounted = false; };
   }, []);
 
   // Handle category selection
@@ -384,36 +280,44 @@ function HomeScreen({ navigation }) {
     setShowCategoryDropdown(false);
     // Navigate to Products screen with category filter
     if (categoryName !== 'All Category') {
-      navigation.navigate('Products', {
-        category: categoryName,
-        fromCategory: true
-      });
+      navigation.navigate({ name: 'Products', params: { category: categoryName, fromCategory: true }, merge: true });
     } else {
       // Show all products when "All Category" is selected
-      navigation.navigate('Products');
+      navigation.navigate({ name: 'Products', merge: true });
     }
   };
 
-  // Auto-scroll banner carousel every 3 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (bannerRef.current) {
-        const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
-        bannerRef.current.scrollToIndex({
-          index: nextIndex,
-          animated: true
-        });
-        setCurrentBannerIndex(nextIndex);
-      }
-    }, 3000);
+  // Improved auto-scroll: pauses during user interaction and resumes smoothly
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const autoTimerRef = useRef(null);
+  const resumeTimerRef = useRef(null);
 
-    return () => clearInterval(interval);
-  }, [currentBannerIndex]);
+  useEffect(() => {
+    if (isUserInteracting) return;
+    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    autoTimerRef.current = setInterval(() => {
+      if (!bannerRef.current) return;
+      const nextIndex = (currentBannerIndex + 1) % banners.length;
+      bannerRef.current.scrollToIndex({ index: nextIndex, animated: true });
+      setCurrentBannerIndex(nextIndex);
+    }, 3500);
+    return () => {
+      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    };
+  }, [currentBannerIndex, isUserInteracting]);
 
   const renderBanner = ({ item, index }) => (
     <TouchableOpacity
       style={[styles.bannerContainer, { width: width - 30 }]}
-      onPress={() => console.log('Banner clicked:', item.title)}
+      onPress={() => {
+
+
+          if (item.action?.type === 'category' && item.action.category) {
+            navigation.navigate({ name: 'Products', params: { category: item.action.category, fromCategory: true }, merge: true });
+          } else if (item.action?.type === 'sale') {
+            navigation.navigate({ name: 'Products', merge: true });
+          }
+        }}
     >
       <Image
         source={{ uri: item.banner }}
@@ -422,9 +326,19 @@ function HomeScreen({ navigation }) {
           console.log('Banner image failed to load:', item.banner);
         }}
       />
-      {/* Banner Overlay with "SHOP" text like website */}
-      <View style={styles.bannerOverlay}>
-        <Text style={styles.bannerShopText}>SHOP</Text>
+      {/* Dynamic overlay text per banner and better touch handling */}
+      <View style={styles.bannerOverlay}
+        onStartShouldSetResponder={() => { setIsUserInteracting(true); return false; }}
+        onResponderRelease={() => {
+          clearTimeout(resumeTimerRef.current);
+          resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
+        }}
+      >
+        <Text style={styles.bannerShopText} numberOfLines={1}>
+          {item.label || (item.action?.type === 'category' && item.action.category
+            ? `Our Newst ${item.action.category}`
+            : 'Our Latest Deals')}
+        </Text>
       </View>
 
       {/* Navigation Arrows */}
@@ -433,9 +347,12 @@ function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.bannerArrow, styles.bannerArrowLeft]}
             onPress={() => {
-              const prevIndex = currentBannerIndex === 0 ? BANNERS.length - 1 : currentBannerIndex - 1;
+              setIsUserInteracting(true);
+              const prevIndex = currentBannerIndex === 0 ? banners.length - 1 : currentBannerIndex - 1;
               bannerRef.current?.scrollToIndex({ index: prevIndex, animated: true });
               setCurrentBannerIndex(prevIndex);
+              clearTimeout(resumeTimerRef.current);
+              resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
             }}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />
@@ -444,9 +361,12 @@ function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={[styles.bannerArrow, styles.bannerArrowRight]}
             onPress={() => {
-              const nextIndex = (currentBannerIndex + 1) % BANNERS.length;
+              setIsUserInteracting(true);
+              const nextIndex = (currentBannerIndex + 1) % banners.length;
               bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
               setCurrentBannerIndex(nextIndex);
+              clearTimeout(resumeTimerRef.current);
+              resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
             }}
           >
             <Ionicons name="chevron-forward" size={20} color="#ffffff" />
@@ -476,7 +396,7 @@ function HomeScreen({ navigation }) {
         navigation.navigate('ProductDetail', { product: item });
       }}
     >
-      <Image source={{ uri: item.images[0] }} style={styles.productImage} />
+      <Image source={getProductImageSource(item)} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.productBrand}>{item.brand}</Text>
@@ -514,10 +434,11 @@ function HomeScreen({ navigation }) {
         {/* EASY SHOP Logo Header */}
         <View style={styles.mainHeader}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <Text style={styles.logoF}>F</Text>
-            </View>
-            <Text style={styles.logoText}>EASY SHOP</Text>
+            <Image
+              source={require('./src/Images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconButton}>
@@ -553,8 +474,18 @@ function HomeScreen({ navigation }) {
                 style={styles.searchInput}
                 placeholder="What do you need"
                 placeholderTextColor="#9ca3af"
+                value={searchValue}
+                onChangeText={setSearchValue}
+                onSubmitEditing={() =>
+                  navigation.navigate('Products', { category: selectedCategory === 'All Category' ? '' : selectedCategory, searchQuery: searchValue })
+                }
               />
-              <TouchableOpacity style={styles.searchButton}>
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={() =>
+                  navigation.navigate('Products', { category: selectedCategory === 'All Category' ? '' : selectedCategory, searchQuery: searchValue })
+                }
+              >
                 <Text style={styles.searchButtonText}>SEARCH</Text>
               </TouchableOpacity>
             </View>
@@ -568,24 +499,30 @@ function HomeScreen({ navigation }) {
       <View style={styles.heroSection}>
         <FlatList
           ref={bannerRef}
-          data={BANNERS}
+          data={banners}
           renderItem={renderBanner}
           keyExtractor={(item) => item._id}
           horizontal
           showsHorizontalScrollIndicator={false}
           pagingEnabled
-          snapToInterval={width - 30}
+          snapToInterval={ITEM_WIDTH}
+          getItemLayout={(_, i) => ({ length: ITEM_WIDTH, offset: ITEM_WIDTH * i, index: i })}
+          onScrollBeginDrag={() => setIsUserInteracting(true)}
+          onScrollEndDrag={() => {
+            clearTimeout(resumeTimerRef.current);
+            resumeTimerRef.current = setTimeout(() => setIsUserInteracting(false), 2000);
+          }}
           decelerationRate="fast"
           contentContainerStyle={styles.bannerCarousel}
           onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / (width - 30));
+            const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
             setCurrentBannerIndex(index);
           }}
         />
 
         {/* Dots Indicator - EXACT LIKE WEBSITE */}
         <View style={styles.dotsContainer}>
-          {BANNERS.map((_, index) => (
+          {banners.map((_, index) => (
             <TouchableOpacity
               key={index}
               style={[
@@ -605,7 +542,7 @@ function HomeScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Shop by Category</Text>
         <FlatList
-          data={categories}
+          data={sortedCategories}
           renderItem={renderCategory}
           keyExtractor={(item) => item._id}
           horizontal
@@ -618,21 +555,24 @@ function HomeScreen({ navigation }) {
           style={styles.viewAllButton}
           onPress={() => navigation.navigate('Products')}
         >
-          <Text style={styles.viewAllButtonText}>View All Products ({PRODUCTS.length})</Text>
+          <Text style={styles.viewAllButtonText}>View All Products ({productsCount})</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Featured Products - EXACT LIKE WEBSITE */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Featured Products</Text>
-        <FlatList
-          data={products.slice(0, 6)}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item._id}
-          numColumns={2}
-          contentContainerStyle={styles.productsList}
-        />
-      </View>
+      {/* Featured Products - Dynamic Mix that rotates every 2 minutes */}
+      {featuredProducts.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Feature Products</Text>
+          <FlatList
+            data={featuredProducts}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item._id}
+            numColumns={2}
+            contentContainerStyle={styles.productsList}
+          />
+        </View>
+      )}
+
 
       {/* Recently Viewed Products - PERSONALIZED FOR USER */}
       {recentlyViewed.length > 0 && (
@@ -700,13 +640,41 @@ function HomeScreen({ navigation }) {
 // Products Screen - EXACT LIKE WEBSITE
 function ProductsScreen({ navigation, route }) {
   const { category } = route.params || {};
+  const searchQuery = route.params?.searchQuery || '';
   const { addToRecentlyViewed } = useRecentlyViewed();
 
-  // If accessed from bottom tab, always show all products
-  // If accessed from category selection, show filtered products
-  const filteredProducts = category && route.params?.fromCategory
-    ? PRODUCTS.filter(p => p.category === category)
-    : PRODUCTS;
+  // API-driven Products Screen with pagination (loads all)
+  const [products, setProducts] = React.useState([]);
+  const [pageNumber, setPageNumber] = React.useState(1);
+  const [totalProduct, setTotalProduct] = React.useState(0);
+  const [parPage, setParPage] = React.useState(12);
+  const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+
+  const fetchPage = React.useCallback(async (page, reset=false) => {
+    try {
+      if (reset) setLoading(true); else setLoadingMore(true);
+      const qs = `category=${encodeURIComponent(category || '')}&&searchValue=${encodeURIComponent(searchQuery || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}`;
+      const r = await fetch(`${API_BASE_URL}/home/query-products?${qs}`);
+      const d = await r.json();
+      const live = Array.isArray(d.products) ? d.products : [];
+      setTotalProduct(d.totalProduct || 0);
+      setParPage(d.parPage || parPage);
+      setProducts(prev => reset ? live : [...prev, ...live]);
+      setPageNumber(page);
+    } catch (e) {
+      if (reset) setProducts([]);
+    } finally {
+      if (reset) setLoading(false); else setLoadingMore(false);
+    }
+  }, [category, parPage, searchQuery]);
+
+  React.useEffect(() => {
+    // reset on category change
+    setProducts([]);
+    setPageNumber(1);
+    fetchPage(1, true);
+  }, [category, fetchPage]);
 
   const renderProduct = ({ item }) => (
     <TouchableOpacity
@@ -716,7 +684,7 @@ function ProductsScreen({ navigation, route }) {
         navigation.navigate('ProductDetail', { product: item });
       }}
     >
-      <Image source={{ uri: item.images[0] }} style={styles.productImage} />
+      <Image source={getProductImageSource(item)} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <Text style={styles.productBrand}>{item.brand}</Text>
@@ -762,21 +730,35 @@ function ProductsScreen({ navigation, route }) {
       </View>
 
       <FlatList
-        data={filteredProducts}
+        data={products}
         renderItem={renderProduct}
         keyExtractor={(item) => item._id}
         numColumns={2}
         contentContainerStyle={styles.productsList}
         showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.4}
+        onEndReached={() => {
+          if (products.length < totalProduct && !loadingMore) {
+            fetchPage(pageNumber + 1);
+          }
+        }}
+        ListFooterComponent={loadingMore ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator size="small" color="#2196F3" />
+          </View>
+        ) : null}
       />
     </View>
   );
 }
 
-// Product Detail Screen - EXACT LIKE WEBSITE
+// Product Detail Screen - ENHANCED WITH "PEOPLE ALSO LIKE"
 function ProductDetailScreen({ navigation, route }) {
   const { product } = route.params;
   const { addToRecentlyViewed } = useRecentlyViewed();
+  const [suggestedProducts, setSuggestedProducts] = useState([]);
+  const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState(0);
+  const suggestionRef = useRef(null);
 
   // Add to recently viewed when component mounts
   useEffect(() => {
@@ -784,6 +766,115 @@ function ProductDetailScreen({ navigation, route }) {
       addToRecentlyViewed(product);
     }
   }, [product, addToRecentlyViewed]);
+
+  // Generate "People also like" products - mix from different categories
+  useEffect(() => {
+    const generateSuggestedProducts = () => {
+      // Mix of products from different categories
+      const mixedProducts = [
+        // Electronics
+        {
+          _id: 'suggest_1',
+          name: 'Wireless Headphones',
+          brand: 'TechSound',
+          price: 89.99,
+          discount: 15,
+          rating: 4.5,
+          stock: 25,
+          category: 'Electronics',
+          images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'],
+          description: 'Premium wireless headphones with noise cancellation'
+        },
+        // Toys
+        {
+          _id: 'suggest_2',
+          name: 'Educational Building Blocks',
+          brand: 'KidsPlay',
+          price: 34.99,
+          discount: 20,
+          rating: 4.8,
+          stock: 40,
+          category: 'Toys',
+          images: ['https://images.unsplash.com/photo-1558877385-8c1b8b6e5e8e?auto=format&fit=crop&w=800&q=80'],
+          description: 'Creative building blocks for developing minds'
+        },
+        // Home & Kitchen
+        {
+          _id: 'suggest_3',
+          name: 'Smart Coffee Maker',
+          brand: 'BrewMaster',
+          price: 129.99,
+          discount: 10,
+          rating: 4.3,
+          stock: 15,
+          category: 'Home & Kitchen',
+          images: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80'],
+          description: 'WiFi-enabled coffee maker with app control'
+        },
+        // Books
+        {
+          _id: 'suggest_4',
+          name: 'The Art of Programming',
+          brand: 'TechBooks',
+          price: 49.99,
+          discount: 25,
+          rating: 4.7,
+          stock: 30,
+          category: 'Books',
+          images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80'],
+          description: 'Comprehensive guide to modern programming'
+        },
+        // Clothing
+        {
+          _id: 'suggest_5',
+          name: 'Premium Cotton T-Shirt',
+          brand: 'ComfortWear',
+          price: 24.99,
+          discount: 30,
+          rating: 4.4,
+          stock: 50,
+          category: 'Clothing',
+          images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=80'],
+          description: 'Soft, breathable cotton t-shirt in multiple colors'
+        },
+        // Sports
+        {
+          _id: 'suggest_6',
+          name: 'Yoga Mat Pro',
+          brand: 'FitLife',
+          price: 39.99,
+          discount: 15,
+          rating: 4.6,
+          stock: 35,
+          category: 'Sports',
+          images: ['https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80'],
+          description: 'Non-slip yoga mat for all fitness levels'
+        }
+      ];
+
+      // Shuffle and select 4-5 products
+      const shuffled = mixedProducts.sort(() => 0.5 - Math.random());
+      setSuggestedProducts(shuffled.slice(0, 5));
+    };
+
+    generateSuggestedProducts();
+  }, [product]);
+
+  // Auto-scroll carousel every 4 seconds
+  useEffect(() => {
+    if (suggestedProducts.length === 0) return;
+
+    const interval = setInterval(() => {
+      const nextIndex = (currentSuggestionIndex + 1) % suggestedProducts.length;
+      suggestionRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true
+      });
+      setCurrentSuggestionIndex(nextIndex);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [currentSuggestionIndex, suggestedProducts.length]);
 
   return (
     <ScrollView style={styles.container}>
@@ -842,6 +933,64 @@ function ProductDetailScreen({ navigation, route }) {
           </View>
         </View>
       </View>
+
+      {/* People Also Like Section */}
+      {__DEV__ && suggestedProducts.length > 0 && (
+        <View style={styles.suggestionsSection}>
+          <Text style={styles.suggestionsTitle}>People also like</Text>
+          <FlatList
+            ref={suggestionRef}
+            data={suggestedProducts}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionCard}
+                onPress={() => navigation.push('ProductDetail', { product: item })}
+              >
+                <Image source={getProductImageSource(item)} style={styles.suggestionImage} />
+                <View style={styles.suggestionInfo}>
+                  <Text style={styles.suggestionName} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.suggestionBrand}>{item.brand}</Text>
+                  <View style={styles.suggestionPriceContainer}>
+                    {item.discount > 0 && (
+                      <Text style={styles.suggestionOriginalPrice}>${item.price}</Text>
+                    )}
+                    <Text style={styles.suggestionPrice}>
+                      ${item.discount > 0 ? (item.price * (1 - item.discount / 100)).toFixed(2) : item.price}
+                    </Text>
+                  </View>
+                  <View style={styles.suggestionRating}>
+                    <Ionicons name="star" size={12} color="#fbbf24" />
+                    <Text style={styles.suggestionRatingText}>{item.rating}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+            keyExtractor={(item) => item._id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={width * 0.45}
+            decelerationRate="fast"
+            contentContainerStyle={styles.suggestionsCarousel}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / (width * 0.45));
+              setCurrentSuggestionIndex(index);
+            }}
+          />
+
+          {/* Dots Indicator */}
+          <View style={styles.suggestionsIndicator}>
+            {suggestedProducts.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.suggestionDot,
+                  index === currentSuggestionIndex && styles.suggestionDotActive
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -874,27 +1023,80 @@ function CartScreen({ navigation }) {
   );
 }
 
-// Profile Screen - EXACT LIKE WEBSITE
+// Profile Screen - ENHANCED WITH REAL USER DATA
 function ProfileScreen({ navigation }) {
+  const [user, setUser] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userData');
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#059473" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Account</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <TouchableOpacity onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#059473" />
-        </View>
-        <Text style={styles.userName}>Guest User</Text>
-        <Text style={styles.userEmail}>guest@example.com</Text>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
+          {user?.image ? (
+            <Image source={{ uri: user.image }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={40} color="#059473" />
+            </View>
+          )}
+          <View style={styles.editBadge}>
+            <Ionicons name="camera" size={12} color="#ffffff" />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
+        <Text style={styles.userEmail}>{user?.email || 'guest@example.com'}</Text>
       </View>
 
       <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
           <Ionicons name="person-outline" size={24} color="#059473" />
           <Text style={styles.menuText}>Edit Profile</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -902,7 +1104,7 @@ function ProfileScreen({ navigation }) {
 
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="location-outline" size={24} color="#059473" />
-          <Text style={styles.menuText}>Addresses</Text>
+          <Text style={styles.menuText}>My Addresses</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
@@ -915,6 +1117,18 @@ function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="receipt-outline" size={24} color="#059473" />
           <Text style={styles.menuText}>Order History</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <Ionicons name="settings-outline" size={24} color="#059473" />
+          <Text style={styles.menuText}>Settings</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <Ionicons name="help-circle-outline" size={24} color="#059473" />
+          <Text style={styles.menuText}>Help & Support</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
       </View>
@@ -933,13 +1147,12 @@ function MainTabs() {
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Products') {
-            iconName = focused ? 'grid' : 'grid-outline';
+            // Use Ionicons that exist across versions
+            iconName = focused ? 'pricetags' : 'pricetags-outline';
           } else if (route.name === 'Blog') {
             iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'About') {
-            iconName = focused ? 'information-circle' : 'information-circle-outline';
           } else if (route.name === 'Cart') {
-            iconName = focused ? 'cart' : 'cart-outline';
+            iconName = focused ? 'bag' : 'bag-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -962,7 +1175,6 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Products" component={ProductsScreen} />
       <Tab.Screen name="Blog" component={BlogTabScreen} />
-      <Tab.Screen name="About" component={AboutScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -1799,6 +2011,11 @@ export default function App() {
             component={AboutScreen}
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </RecentlyViewedProvider>
@@ -1810,10 +2027,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  // Header Styles - EXACT LIKE EASYSHOP WEBSITE
+  // Header Styles - RESPONSIVE AND COMPACT
   headerContainer: {
     backgroundColor: '#ffffff',
-    paddingTop: 40,
+    paddingTop: 25, // Much less space above logo
   },
 
   // Top Bar Styles
@@ -1857,48 +2074,42 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // Main Header with EASYSHOP Logo
+  // Main Header with EASYSHOP Logo - EVENLY ALIGNED
   mainHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 2, // Minimal vertical spacing
     backgroundColor: '#ffffff',
+    minHeight: 44, // Smaller consistent height
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'flex-start',
+    flex: 1, // Take available space for better alignment
   },
-  logoIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#1e3a8a',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+  logoImage: {
+    width: 110, // Slightly smaller for better proportion
+    height: 36,
+    maxWidth: 110,
+    maxHeight: 36,
   },
-  logoF: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    letterSpacing: 1,
-  },
+
   headerIcons: {
     flexDirection: 'row',
-    gap: 15,
+    alignItems: 'center',
+    gap: 8, // Even tighter spacing between icons
   },
   iconButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 3, // Reduced padding for tighter spacing
+    borderRadius: 5,
     backgroundColor: '#f9fafb',
+    minWidth: 32, // Consistent button size
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Navigation Menu
@@ -1920,10 +2131,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Search Section - Clean Design
+  // Search Section - Clean Design with Better Spacing
   searchSection: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    paddingHorizontal: 20, // Match main header padding
+    paddingVertical: 4, // Minimal spacing
     backgroundColor: '#ffffff',
     position: 'relative',
     zIndex: 1000,
@@ -2071,7 +2282,7 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
     width: '100%',
-    height: 180, // Much smaller for mobile
+    height: 260, // Even taller hero carousel images
     resizeMode: 'cover',
   },
   bannerOverlay: {
@@ -2387,6 +2598,97 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // People Also Like Styles
+  suggestionsSection: {
+    backgroundColor: '#ffffff',
+    marginTop: 20,
+    paddingVertical: 20,
+  },
+  suggestionsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  suggestionsCarousel: {
+    paddingHorizontal: 10,
+  },
+  suggestionCard: {
+    width: width * 0.4,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  suggestionImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'cover',
+  },
+  suggestionInfo: {
+    padding: 12,
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  suggestionBrand: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  suggestionPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  suggestionOriginalPrice: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+    marginRight: 6,
+  },
+  suggestionPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#059473',
+  },
+  suggestionRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  suggestionRatingText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 4,
+  },
+  suggestionsIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  suggestionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#d1d5db',
+    marginHorizontal: 4,
+  },
+  suggestionDotActive: {
+    backgroundColor: '#059473',
+    width: 20,
+  },
+
   // Login/Register Styles - EXACT LIKE WEBSITE
   form: {
     padding: 20,
@@ -2471,6 +2773,10 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     marginBottom: 20,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 15,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -2478,7 +2784,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#059473',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userName: {
     fontSize: 20,
