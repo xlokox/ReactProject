@@ -54,6 +54,7 @@ const fetchCategories = async () => {
   }
 };
 
+//fetch עם המוצרים של השרת
 const fetchProducts = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/home/get-products`);
