@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import ChatBotScreen from './src/screens/ChatBotScreen';
+import FloatingChatButton from './src/components/FloatingChatButton';
 import getProductImageSource from './src/utils/image';
 
 
@@ -632,6 +634,9 @@ function HomeScreen({ navigation }) {
           ))}
         </View>
       )}
+
+      {/* Floating AI Chat Button */}
+      <FloatingChatButton />
 
     </ScrollView>
   );
@@ -2014,6 +2019,11 @@ export default function App() {
           <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ChatBot"
+            component={ChatBotScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

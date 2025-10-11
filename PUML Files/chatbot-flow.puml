@@ -1,0 +1,168 @@
+@startuml OpenAI Chatbot Flow
+!theme plain
+skinparam backgroundColor #f8f9fa
+
+title OpenAI AI Chatbot Integration Flow
+
+actor Customer
+participant "Mobile App\n(React Native)" as App
+participant "Floating Chat\nButton" as Button
+participant "ChatBot Screen" as ChatScreen
+participant "Backend API\n(Express)" as Backend
+participant "ChatbotController" as Controller
+participant "OpenAI Service" as OpenAI
+participant "OpenAI API\n(GPT-3.5-turbo)" as GPTApi
+database "MongoDB" as DB
+
+== Initial Setup ==
+Customer -> App: Opens EasyShop App
+App -> Button: Displays floating chat button
+note right of Button
+  Green floating button
+  with pulse animation
+  Always visible on home screen
+end note
+
+== Starting Chat ==
+Customer -> Button: Taps chat button
+Button -> ChatScreen: Navigate to ChatBot screen
+ChatScreen -> Backend: GET /api/chatbot/status
+Backend -> Controller: getStatus()
+Controller -> OpenAI: isConfigured()
+OpenAI --> Controller: true/false
+Controller --> Backend: Status response
+Backend --> ChatScreen: { available: true, model: "gpt-3.5-turbo" }
+ChatScreen -> ChatScreen: Display welcome message
+ChatScreen -> ChatScreen: Show suggested questions
+
+== Sending Message ==
+Customer -> ChatScreen: Types message:\n"Help me find a laptop"
+ChatScreen -> ChatScreen: Add user message to UI
+ChatScreen -> ChatScreen: Show typing indicator
+ChatScreen -> Backend: POST /api/chatbot/message\n{\n  message: "Help me find a laptop",\n  conversationHistory: [...]\n}
+
+Backend -> Controller: sendMessage(req, res)
+Controller -> Controller: Validate message
+Controller -> Controller: Prepare conversation history
+
+Controller -> OpenAI: getResponse(message, history)
+OpenAI -> OpenAI: Build request payload:\n- System prompt\n- Conversation history\n- User message
+OpenAI -> GPTApi: POST /v1/chat/completions\n{\n  model: "gpt-3.5-turbo",\n  messages: [...],\n  temperature: 0.7,\n  max_tokens: 500\n}
+
+note right of GPTApi
+  OpenAI processes the request
+  using GPT-3.5-turbo model
+  
+  Considers:
+  - System prompt (personality)
+  - Conversation context
+  - User's question
+end note
+
+GPTApi --> OpenAI: {\n  choices: [{\n    message: {\n      content: "I'd be happy to help..."\n    }\n  }],\n  usage: { total_tokens: 150 }\n}
+
+OpenAI -> OpenAI: Extract AI response
+OpenAI -> OpenAI: Log usage statistics
+OpenAI --> Controller: AI response text
+
+Controller -> Controller: Log interaction
+Controller --> Backend: {\n  message: "I'd be happy to help...",\n  timestamp: "2024-01-15T10:30:00Z"\n}
+
+Backend --> ChatScreen: AI response
+ChatScreen -> ChatScreen: Hide typing indicator
+ChatScreen -> ChatScreen: Add bot message to UI
+ChatScreen --> Customer: Display AI response
+
+== Product Recommendations ==
+Customer -> ChatScreen: "Show me gaming laptops"
+ChatScreen -> Backend: POST /api/chatbot/recommend-products\n{\n  query: "gaming laptops",\n  category: "Electronics"\n}
+
+Backend -> Controller: recommendProducts(req, res)
+Controller -> DB: Find products\n(category: Electronics)
+DB --> Controller: Product list
+
+Controller -> OpenAI: getProductRecommendations(\n  query,\n  products\n)
+OpenAI -> GPTApi: Request with product context
+GPTApi --> OpenAI: Recommendations
+OpenAI --> Controller: AI recommendations
+
+Controller --> Backend: {\n  recommendations: "...",\n  products: [...]\n}
+Backend --> ChatScreen: Response with products
+ChatScreen --> Customer: Display recommendations\nand product cards
+
+== Order Help ==
+Customer -> ChatScreen: "Where is my order?"
+ChatScreen -> Backend: POST /api/chatbot/order-help\n{\n  question: "Where is my order?",\n  orderId: "12345",\n  userId: "user123"\n}
+
+Backend -> Controller: orderHelp(req, res)
+Controller -> DB: Find order by ID
+DB --> Controller: Order details
+
+Controller -> OpenAI: getOrderHelp(\n  question,\n  orderInfo\n)
+OpenAI -> GPTApi: Request with order context
+GPTApi --> OpenAI: Order assistance
+OpenAI --> Controller: AI response
+
+Controller --> Backend: {\n  message: "Your order is...",\n  orderInfo: {...}\n}
+Backend --> ChatScreen: Response
+ChatScreen --> Customer: Display order status
+
+== Suggested Questions ==
+Customer -> ChatScreen: Taps suggested question:\n"What's your return policy?"
+ChatScreen -> ChatScreen: Set input text
+ChatScreen -> Backend: POST /api/chatbot/message
+note right of ChatScreen
+  Same flow as regular message
+  but pre-filled with suggested text
+end note
+
+== Error Handling ==
+ChatScreen -> Backend: POST /api/chatbot/message
+Backend -> Controller: sendMessage()
+Controller -> OpenAI: getResponse()
+OpenAI -> GPTApi: API request
+GPTApi --> OpenAI: ❌ Error: Rate limit exceeded
+
+OpenAI -> OpenAI: Catch error
+OpenAI --> Controller: throw Error("Rate limit...")
+
+Controller -> Controller: Catch error
+Controller --> Backend: {\n  error: "Failed to get AI response",\n  fallbackMessage: "I apologize..."\n}
+
+Backend --> ChatScreen: Error response
+ChatScreen -> ChatScreen: Display fallback message
+ChatScreen --> Customer: "I apologize, but I'm having\ntrouble right now..."
+
+== Conversation Context ==
+note over ChatScreen, OpenAI
+  The chatbot maintains conversation context
+  by sending the last 10 messages with each request.
+  
+  This allows the AI to:
+  - Remember previous questions
+  - Provide contextual answers
+  - Have natural conversations
+  
+  Example:
+  User: "I need a laptop"
+  AI: "What's your budget?"
+  User: "$1000" ← AI remembers the laptop context
+  AI: "Here are laptops under $1000..."
+end note
+
+== Cost Tracking ==
+note over OpenAI, GPTApi
+  Each API call costs based on tokens used:
+  
+  GPT-3.5-turbo: ~$0.002 per 1K tokens
+  
+  Typical conversation:
+  - User message: ~50 tokens
+  - AI response: ~150 tokens
+  - Total: ~200 tokens = $0.0004
+  
+  100 conversations/day ≈ $1-2/month
+end note
+
+@enduml
+
