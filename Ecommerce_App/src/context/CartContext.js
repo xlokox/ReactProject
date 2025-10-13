@@ -33,15 +33,18 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   const loadCart = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('⚠️ Cannot load cart - no user ID');
+      return;
+    }
 
     try {
       setLoading(true);
-      console.log('Loading cart for user:', user.id);
+      console.log('🔄 Loading cart for user:', user.id);
       const response = await api.get('/home/product/get-card-products/' + user.id);
-      console.log('Cart response:', response.data);
+      console.log('📦 Cart response:', JSON.stringify(response.data, null, 2));
 
-      if (response.data.card_products) {
+      if (response.data.card_products && response.data.card_products.length > 0) {
         // Transform backend response to match our cart structure
         const transformedCart = response.data.card_products.map(item => ({
           _id: item._id,
@@ -50,16 +53,18 @@ export const CartProvider = ({ children }) => {
           userId: item.userId
         }));
 
-        console.log('Transformed cart:', transformedCart);
+        console.log('✅ Transformed cart items:', transformedCart.length);
+        console.log('📋 Cart items:', JSON.stringify(transformedCart, null, 2));
         setCartItems(transformedCart);
         setCartCount(transformedCart.length);
       } else {
+        console.log('⚠️ No cart products found in response');
         setCartItems([]);
         setCartCount(0);
       }
     } catch (error) {
-      console.error('Error loading cart:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('❌ Error loading cart:', error);
+      console.error('❌ Error response:', error.response?.data);
       // Fallback to empty cart on error
       setCartItems([]);
       setCartCount(0);
@@ -88,23 +93,26 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (product, quantity = 1) => {
     try {
       if (user && token) {
-        console.log('Adding to cart (logged in):', { userId: user.id, productId: product._id, quantity });
+        console.log('🛒 Adding to cart (logged in):', { userId: user.id, productId: product._id, productName: product.name, quantity });
         const response = await api.post('/home/product/add-to-card', {
           userId: user.id,
           productId: product._id,
           quantity
         });
 
-        console.log('Add to cart response:', response.data);
+        console.log('📥 Add to cart response:', response.data);
 
         if (response.data.message === 'Added To Card Successfully') {
+          console.log('✅ Product added successfully, reloading cart...');
           await loadCart();
+          console.log('🔄 Cart reloaded after adding product');
           return { success: true, message: 'המוצר נוסף לעגלה' };
         } else {
+          console.log('❌ Failed to add product:', response.data);
           return { success: false, message: response.data.error || 'שגיאה בהוספה לעגלה' };
         }
       } else {
-        console.log('Adding to cart (guest):', product.name);
+        console.log('🛒 Adding to cart (guest):', product.name);
         // Handle local cart
         const existingItem = cartItems.find(item => item.product._id === product._id);
         let newCart;
@@ -125,8 +133,8 @@ export const CartProvider = ({ children }) => {
         return { success: true, message: 'המוצר נוסף לעגלה' };
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('❌ Error adding to cart:', error);
+      console.error('❌ Error response:', error.response?.data);
       return { success: false, message: error.response?.data?.error || 'שגיאה בהוספה לעגלה' };
     }
   };

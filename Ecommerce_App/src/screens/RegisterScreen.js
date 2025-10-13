@@ -114,6 +114,7 @@ export default function RegisterScreen({ navigation }) {
               mode="contained"
               onPress={handleRegister}
               style={styles.registerButton}
+              buttonColor="#059473"
               loading={loading}
               disabled={loading}
             >

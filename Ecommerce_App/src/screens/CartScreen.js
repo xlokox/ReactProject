@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import {
   Title,
@@ -16,17 +17,27 @@ import {
   Divider,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import getProductImageSource from '../utils/image';
 import { useCart } from '../context/CartContext';
 
 export default function CartScreen({ navigation }) {
-  const { 
-    cartItems, 
-    updateQuantity, 
-    removeFromCart, 
-    getCartTotal, 
-    loading 
+  const {
+    cartItems,
+    updateQuantity,
+    removeFromCart,
+    getCartTotal,
+    loading,
+    loadCart
   } = useCart();
+
+  // Reload cart whenever the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Cart screen focused - reloading cart');
+      loadCart();
+    }, [loadCart])
+  );
 
   const handleQuantityChange = async (itemId, newQuantity) => {
     if (newQuantity < 1) {
@@ -117,6 +128,7 @@ export default function CartScreen({ navigation }) {
         mode="contained"
         onPress={() => navigation.navigate('Products')}
         style={styles.shopButton}
+        buttonColor="#059473"
       >
         התחל לקנות
       </Button>
@@ -128,7 +140,7 @@ export default function CartScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={cartItems}
         renderItem={renderCartItem}
@@ -136,32 +148,33 @@ export default function CartScreen({ navigation }) {
         contentContainerStyle={styles.cartList}
         showsVerticalScrollIndicator={false}
       />
-      
+
       <Card style={styles.summaryCard}>
         <Card.Content>
           <View style={styles.summaryRow}>
             <Paragraph>סה"כ פריטים:</Paragraph>
             <Paragraph>{cartItems.length}</Paragraph>
           </View>
-          
+
           <View style={styles.summaryRow}>
             <Paragraph>סה"כ כמות:</Paragraph>
             <Paragraph>
               {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
             </Paragraph>
           </View>
-          
+
           <Divider style={styles.divider} />
-          
+
           <View style={styles.totalRow}>
             <Title>סה"כ לתשלום:</Title>
             <Title style={styles.totalAmount}>₪{getCartTotal().toFixed(2)}</Title>
           </View>
-          
+
           <Button
             mode="contained"
             onPress={handleCheckout}
             style={styles.checkoutButton}
+            buttonColor="#059473"
             loading={loading}
             disabled={loading}
           >
@@ -169,7 +182,7 @@ export default function CartScreen({ navigation }) {
           </Button>
         </Card.Content>
       </Card>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -180,6 +193,7 @@ const styles = StyleSheet.create({
   },
   cartList: {
     padding: 16,
+    paddingTop: 8,
   },
   cartItem: {
     marginBottom: 12,

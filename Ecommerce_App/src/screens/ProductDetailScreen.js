@@ -56,6 +56,7 @@ export default function ProductDetailScreen({ route, navigation }) {
             mode="contained"
             onPress={handleAddToCart}
             style={styles.addButton}
+            buttonColor="#059473"
           >
             הוסף לעגלה
           </Button>

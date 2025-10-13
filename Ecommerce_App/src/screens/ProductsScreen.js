@@ -108,6 +108,7 @@ export default function ProductsScreen({ navigation, route }) {
             compact
             onPress={() => handleAddToCart(item)}
             style={styles.addButton}
+            buttonColor="#059473"
           >
             הוסף לעגלה
           </Button>

@@ -7,14 +7,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
   Alert,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
   const { login: authLogin, loading } = useAuth();
@@ -37,7 +36,7 @@ export default function LoginScreen({ navigation }) {
     console.log('Password:', state.password ? '***' : 'empty');
 
     if (!state.email || !state.password) {
-      Alert.alert('Error', 'Please fill all fields');
+      Alert.alert('שגיאה', 'אנא מלא את כל השדות');
       return;
     }
 
@@ -48,101 +47,124 @@ export default function LoginScreen({ navigation }) {
 
     if (result.success) {
       console.log('✅ Login successful! Navigating to Main...');
-      Alert.alert('Success', 'Login successful!', [
-        { text: 'OK', onPress: () => navigation.replace('Main') }
+      Alert.alert('הצלחה', 'התחברת בהצלחה!', [
+        { text: 'אישור', onPress: () => navigation.replace('Main') }
       ]);
     } else {
       console.log('❌ Login failed:', result.message);
-      Alert.alert('Error', result.message || 'Login failed');
+      Alert.alert('שגיאה', result.message || 'ההתחברות נכשלה');
     }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {loading && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#059473" />
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.loginContainer}>
-          <View style={styles.formContainer}>
-            <Text style={styles.title}>Login</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Logo/Header Section */}
+        <View style={styles.headerSection}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="storefront" size={60} color="#059473" />
+            <Text style={styles.logoText}>EasyShop</Text>
+          </View>
+        </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+        {/* Login Form Card */}
+        <View style={styles.formCard}>
+          <Text style={styles.title}>התחברות</Text>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>אימייל</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color="#64748b" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={state.email}
                 onChangeText={(text) => inputHandle('email', text)}
-                placeholder="Email"
+                placeholder="הכנס את האימייל שלך"
+                placeholderTextColor="#94a3b8"
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
+          </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>סיסמה</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={state.password}
                 onChangeText={(text) => inputHandle('password', text)}
-                placeholder="Password"
+                placeholder="הכנס את הסיסמה שלך"
+                placeholderTextColor="#94a3b8"
                 secureTextEntry
               />
             </View>
-
-            <TouchableOpacity style={styles.loginButton} onPress={login}>
-              <Text style={styles.loginButtonText}>Login</Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity style={styles.facebookButton}>
-              <Ionicons name="logo-facebook" size={20} color="#ffffff" style={{marginRight: 8}} />
-              <Text style={styles.socialButtonText}>Login With Facebook</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.googleButton}>
-              <Ionicons name="logo-google" size={20} color="#ffffff" style={{marginRight: 8}} />
-              <Text style={styles.socialButtonText}>Login With Google</Text>
-            </TouchableOpacity>
-
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>
-                Don't Have An Account?{' '}
-                <Text
-                  style={styles.registerLink}
-                  onPress={() => navigation.navigate('Register')}
-                >
-                  Register
-                </Text>
-              </Text>
-            </View>
           </View>
 
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: 'https://via.placeholder.com/400x300/059473/ffffff?text=E-Commerce' }}
-              style={styles.loginImage}
-              resizeMode="cover"
-            />
+          <TouchableOpacity style={styles.loginButton} onPress={login}>
+            <Text style={styles.loginButtonText}>התחבר</Text>
+          </TouchableOpacity>
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>או</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity style={styles.facebookButton}>
+            <Ionicons name="logo-facebook" size={22} color="#ffffff" style={styles.socialIcon} />
+            <Text style={styles.socialButtonText}>התחבר עם Facebook</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.googleButton}>
+            <Ionicons name="logo-google" size={22} color="#ffffff" style={styles.socialIcon} />
+            <Text style={styles.socialButtonText}>התחבר עם Google</Text>
+          </TouchableOpacity>
+
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>
+              אין לך חשבון?{' '}
+              <Text
+                style={styles.registerLink}
+                onPress={() => navigation.navigate('Register')}
+              >
+                הירשם עכשיו
+              </Text>
+            </Text>
           </View>
         </View>
+
+        {/* Illustration Section */}
+        <View style={styles.illustrationContainer}>
+          <Image
+            source={{ uri: 'https://cdni.iconscout.com/illustration/premium/thumb/login-page-4468581-3783954.png' }}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+        </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
   },
   loaderContainer: {
     position: 'absolute',
@@ -150,81 +172,98 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(56, 48, 48, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 40,
+    paddingHorizontal: 24,
+    paddingVertical: 40,
   },
-  loginContainer: {
-    flexDirection: 'row',
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoContainer: {
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#059473',
+    marginTop: 12,
+    letterSpacing: 1,
+  },
+  formCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    overflow: 'hidden',
-    minHeight: 500,
-  },
-  formContainer: {
-    flex: 1,
-    padding: 32,
-  },
-  imageContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  loginImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
+    borderRadius: 20,
+    padding: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 32,
   },
   title: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#64748b',
-    marginBottom: 24,
+    color: '#1e293b',
+    marginBottom: 32,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   label: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 10,
+    textAlign: 'right',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flex: 1,
     fontSize: 16,
-    backgroundColor: 'transparent',
+    color: '#1e293b',
+    textAlign: 'right',
   },
   loginButton: {
     backgroundColor: '#059473',
-    paddingVertical: 12,
-    borderRadius: 6,
+    paddingVertical: 16,
+    borderRadius: 12,
     marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowColor: '#059473',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   loginButtonText: {
     color: 'white',
     textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 28,
   },
   dividerLine: {
     flex: 1,
@@ -232,52 +271,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#cbd5e1',
   },
   dividerText: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     color: '#64748b',
+    fontSize: 14,
+    fontWeight: '500',
   },
   facebookButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6366f1',
-    paddingVertical: 12,
-    borderRadius: 6,
-    marginBottom: 12,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#4267B2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+    shadowColor: '#4267B2',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 3.84,
+    shadowRadius: 6,
     elevation: 5,
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ef4444',
-    paddingVertical: 12,
-    borderRadius: 6,
-    marginBottom: 12,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#DB4437',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+    shadowColor: '#DB4437',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 3.84,
+    shadowRadius: 6,
     elevation: 5,
+  },
+  socialIcon: {
+    marginRight: 10,
   },
   socialButtonText: {
     color: 'white',
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   registerContainer: {
-    marginTop: 8,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
   },
   registerText: {
     textAlign: 'center',
     color: '#64748b',
+    fontSize: 15,
   },
   registerLink: {
-    color: '#3b82f6',
-    fontWeight: '500',
+    color: '#059473',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  illustrationContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  illustration: {
+    width: 280,
+    height: 200,
   },
 });

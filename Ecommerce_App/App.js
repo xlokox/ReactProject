@@ -3,14 +3,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, FlatList, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { CartProvider } from './src/context/CartContext';
+import { CartProvider, useCart } from './src/context/CartContext';
 import RealLoginScreen from './src/screens/LoginScreen';
 import RealRegisterScreen from './src/screens/RegisterScreen';
+import RealCartScreen from './src/screens/CartScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ChatBotScreen from './src/screens/ChatBotScreen';
 import FloatingChatButton from './src/components/FloatingChatButton';
@@ -180,6 +182,11 @@ function HomeScreen({ navigation }) {
   // const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
   const recentlyViewed = [];
   const addToRecentlyViewed = () => {};
+
+  // Cart and Auth context
+  const { user } = useAuth();
+  const { addToCart: addToCartContext } = useCart();
+  const [loadingProductId, setLoadingProductId] = React.useState(null);
 
 
   // Mobile hero banners - loaded from backend, with placeholders when empty
@@ -397,6 +404,45 @@ function HomeScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  const handleAddToCart = async (product) => {
+    console.log('🛒 Add to Cart clicked (Home Screen)!');
+    console.log('User:', user);
+    console.log('Product:', product.name);
+
+    if (!user) {
+      console.log('❌ User not logged in');
+      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'התחבר', onPress: () => navigation.navigate('Login') }
+      ]);
+      return;
+    }
+
+    try {
+      console.log('✅ User is logged in, adding to cart...');
+      setLoadingProductId(product._id);
+      const result = await addToCartContext(product, 1);
+
+      console.log('Cart result:', result);
+
+      if (result && result.success) {
+        console.log('✅ Product added successfully!');
+        Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
+          { text: 'המשך קניות', style: 'cancel' },
+          { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
+        ]);
+      } else {
+        console.log('❌ Failed to add product:', result?.message);
+        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('שגיאה', 'לא ניתן להוסיף את המוצר לעגלה');
+    } finally {
+      setLoadingProductId(null);
+    }
+  };
+
   const renderProduct = ({ item }) => (
     <TouchableOpacity
       style={styles.productCard}
@@ -428,9 +474,19 @@ function HomeScreen({ navigation }) {
           ))}
           <Text style={styles.ratingText}>({item.rating})</Text>
         </View>
-        <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="cart" size={16} color="#ffffff" />
-          <Text style={styles.addButtonText}>Add to Cart</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => handleAddToCart(item)}
+          disabled={loadingProductId === item._id}
+        >
+          {loadingProductId === item._id ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <>
+              <Ionicons name="cart" size={16} color="#ffffff" />
+              <Text style={styles.addButtonText}>Add to Cart</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -654,6 +710,11 @@ function ProductsScreen({ navigation, route }) {
   const searchQuery = route.params?.searchQuery || '';
   const { addToRecentlyViewed } = useRecentlyViewed();
 
+  // Cart and Auth context
+  const { user } = useAuth();
+  const { addToCart: addToCartContext } = useCart();
+  const [loadingProductId, setLoadingProductId] = React.useState(null);
+
   // API-driven Products Screen with pagination (loads all)
   const [products, setProducts] = React.useState([]);
   const [pageNumber, setPageNumber] = React.useState(1);
@@ -687,6 +748,45 @@ function ProductsScreen({ navigation, route }) {
     fetchPage(1, true);
   }, [category, fetchPage]);
 
+  const handleAddToCart = async (product) => {
+    console.log('🛒 Add to Cart clicked (Products Screen)!');
+    console.log('User:', user);
+    console.log('Product:', product.name);
+
+    if (!user) {
+      console.log('❌ User not logged in');
+      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'התחבר', onPress: () => navigation.navigate('Login') }
+      ]);
+      return;
+    }
+
+    try {
+      console.log('✅ User is logged in, adding to cart...');
+      setLoadingProductId(product._id);
+      const result = await addToCartContext(product, 1);
+
+      console.log('Cart result:', result);
+
+      if (result && result.success) {
+        console.log('✅ Product added successfully!');
+        Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
+          { text: 'המשך קניות', style: 'cancel' },
+          { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
+        ]);
+      } else {
+        console.log('❌ Failed to add product:', result?.message);
+        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('שגיאה', 'לא ניתן להוסיף את המוצר לעגלה');
+    } finally {
+      setLoadingProductId(null);
+    }
+  };
+
   const renderProduct = ({ item }) => (
     <TouchableOpacity
       style={styles.productCard}
@@ -718,9 +818,19 @@ function ProductsScreen({ navigation, route }) {
           ))}
           <Text style={styles.ratingText}>({item.rating})</Text>
         </View>
-        <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="cart" size={16} color="#ffffff" />
-          <Text style={styles.addButtonText}>Add to Cart</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => handleAddToCart(item)}
+          disabled={loadingProductId === item._id}
+        >
+          {loadingProductId === item._id ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <>
+              <Ionicons name="cart" size={16} color="#ffffff" />
+              <Text style={styles.addButtonText}>Add to Cart</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -771,6 +881,9 @@ function ProductDetailScreen({ navigation, route }) {
   const [suggestedProducts, setSuggestedProducts] = useState([]);
   const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState(0);
   const suggestionRef = useRef(null);
+  const { user } = useAuth();
+  const { addToCart: addToCartContext } = useCart();
+  const [loadingCart, setLoadingCart] = useState(false);
 
   // Add to recently viewed when component mounts
   useEffect(() => {
@@ -779,6 +892,45 @@ function ProductDetailScreen({ navigation, route }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?._id]);
+
+  const handleAddToCart = async () => {
+    console.log('🛒 Add to Cart clicked (Product Detail)!');
+    console.log('User:', user);
+    console.log('Product:', product.name);
+
+    if (!user) {
+      console.log('❌ User not logged in');
+      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'התחבר', onPress: () => navigation.navigate('Login') }
+      ]);
+      return;
+    }
+
+    try {
+      console.log('✅ User is logged in, adding to cart...');
+      setLoadingCart(true);
+      const result = await addToCartContext(product, 1);
+
+      console.log('Cart result:', result);
+
+      if (result && result.success) {
+        console.log('✅ Product added successfully!');
+        Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
+          { text: 'המשך קניות', style: 'cancel' },
+          { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
+        ]);
+      } else {
+        console.log('❌ Failed to add product');
+        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('שגיאה', 'לא ניתן להוסיף את המוצר לעגלה');
+    } finally {
+      setLoadingCart(false);
+    }
+  };
 
   // Generate "People also like" products - mix from different categories
   useEffect(() => {
@@ -935,9 +1087,19 @@ function ProductDetailScreen({ navigation, route }) {
           <Text style={styles.productDescription}>{product.description}</Text>
 
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.addToCartButton}>
-              <Ionicons name="cart" size={20} color="#ffffff" />
-              <Text style={styles.addToCartText}>Add to Cart</Text>
+            <TouchableOpacity
+              style={styles.addToCartButton}
+              onPress={handleAddToCart}
+              disabled={loadingCart}
+            >
+              {loadingCart ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="cart" size={20} color="#ffffff" />
+                  <Text style={styles.addToCartText}>Add to Cart</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.buyNowButton}>
@@ -1008,33 +1170,8 @@ function ProductDetailScreen({ navigation, route }) {
   );
 }
 
-// Cart Screen - EXACT LIKE WEBSITE
-function CartScreen({ navigation }) {
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Shopping Cart</Text>
-        <TouchableOpacity>
-          <Ionicons name="trash-outline" size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.emptyCart}>
-        <Ionicons name="bag-outline" size={80} color="#9ca3af" />
-        <Text style={styles.emptyCartText}>Your cart is empty</Text>
-        <TouchableOpacity
-          style={styles.shopNowButton}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Text style={styles.shopNowText}>Shop Now</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+// Cart Screen - Using the real CartScreen component from src/screens/CartScreen.js
+// (Removed placeholder - now using RealCartScreen imported above)
 
 // Profile Screen - ENHANCED WITH REAL USER DATA
 function ProfileScreen({ navigation }) {
@@ -1186,7 +1323,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Products" component={ProductsScreen} />
       <Tab.Screen name="Blog" component={BlogTabScreen} />
-      <Tab.Screen name="Cart" component={CartScreen} />
+      <Tab.Screen name="Cart" component={RealCartScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -1984,7 +2121,7 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        {/* <RecentlyViewedProvider> */}
+        <RecentlyViewedProvider>
           <NavigationContainer>
             <StatusBar style="light" />
             <Stack.Navigator
@@ -2040,13 +2177,18 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="Checkout"
+            component={CheckoutScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="ChatBot"
             component={ChatBotScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>
-        {/* </RecentlyViewedProvider> */}
+        </RecentlyViewedProvider>
       </CartProvider>
     </AuthProvider>
   );

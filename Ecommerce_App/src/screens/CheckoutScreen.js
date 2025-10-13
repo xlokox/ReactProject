@@ -4,6 +4,8 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  TouchableOpacity,
+  Text,
 } from 'react-native';
 import {
   Title,
@@ -13,6 +15,7 @@ import {
   TextInput,
   RadioButton,
 } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
 import api from '../api/api';
 
@@ -132,10 +135,20 @@ export default function CheckoutScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Order Summary */}
-      <Card style={styles.card}>
-        <Card.Content>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>תשלום</Text>
+        <View style={styles.headerRight} />
+      </View>
+
+      <ScrollView style={styles.scrollContent}>
+        {/* Order Summary */}
+        <Card style={styles.card}>
+          <Card.Content>
           <Title>סיכום הזמנה</Title>
           {cartItems.map((item, index) => (
             <View key={index} style={styles.orderItem}>
@@ -271,16 +284,18 @@ export default function CheckoutScreen({ navigation }) {
         </Card.Content>
       </Card>
 
-      <Button
-        mode="contained"
-        onPress={handlePlaceOrder}
-        style={styles.orderButton}
-        loading={loading}
-        disabled={loading}
-      >
-        בצע הזמנה
-      </Button>
-    </ScrollView>
+        <Button
+          mode="contained"
+          onPress={handlePlaceOrder}
+          style={styles.orderButton}
+          buttonColor="#059473"
+          loading={loading}
+          disabled={loading}
+        >
+          בצע הזמנה
+        </Button>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -288,6 +303,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#059473',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: 50, // Account for status bar
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerRight: {
+    width: 32, // Same width as back button for centering
+  },
+  scrollContent: {
+    flex: 1,
   },
   card: {
     margin: 16,
