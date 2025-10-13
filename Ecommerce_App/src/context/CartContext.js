@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/api';
 import { useAuth } from './AuthContext';
@@ -19,31 +19,7 @@ export const CartProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const { user, token } = useAuth();
 
-  useEffect(() => {
-    if (user && token) {
-      loadCart();
-    } else {
-      loadLocalCart();
-    }
-  }, [user, token]);
-
-  const loadCart = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/home/product/get-card-product/' + user?.id);
-      if (response.data.success) {
-        setCartItems(response.data.cart);
-        setCartCount(response.data.cart.length);
-      }
-    } catch (error) {
-      console.error('Error loading cart:', error);
-      loadLocalCart();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadLocalCart = async () => {
+  const loadLocalCart = useCallback(async () => {
     try {
       const localCart = await AsyncStorage.getItem('localCart');
       if (localCart) {
@@ -54,7 +30,49 @@ export const CartProvider = ({ children }) => {
     } catch (error) {
       console.error('Error loading local cart:', error);
     }
-  };
+  }, []);
+
+  const loadCart = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      console.log('Loading cart for user:', user.id);
+      const response = await api.get('/home/product/get-card-product/' + user.id);
+      console.log('Cart response:', response.data);
+
+      if (response.data.card_products) {
+        // Transform backend response to match our cart structure
+        const transformedCart = response.data.card_products.map(item => ({
+          _id: item._id,
+          product: item.products && item.products[0] ? item.products[0] : {},
+          quantity: item.quantity,
+          userId: item.userId
+        }));
+
+        console.log('Transformed cart:', transformedCart);
+        setCartItems(transformedCart);
+        setCartCount(transformedCart.length);
+      } else {
+        setCartItems([]);
+        setCartCount(0);
+      }
+    } catch (error) {
+      console.error('Error loading cart:', error);
+      console.error('Error response:', error.response?.data);
+      loadLocalCart();
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, loadLocalCart]);
+
+  useEffect(() => {
+    if (user && token) {
+      loadCart();
+    } else {
+      loadLocalCart();
+    }
+  }, [user, token, loadCart, loadLocalCart]);
 
   const saveLocalCart = async (cart) => {
     try {
@@ -67,16 +85,27 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (product, quantity = 1) => {
     try {
       if (user && token) {
-        const response = await cartAPI.addToCart(product._id, quantity);
-        if (response.data.success) {
+        console.log('Adding to cart (logged in):', { userId: user.id, productId: product._id, quantity });
+        const response = await api.post('/home/product/add-to-card', {
+          userId: user.id,
+          productId: product._id,
+          quantity
+        });
+
+        console.log('Add to cart response:', response.data);
+
+        if (response.data.message === 'Added To Card Successfully') {
           await loadCart();
           return { success: true, message: 'המוצר נוסף לעגלה' };
+        } else {
+          return { success: false, message: response.data.error || 'שגיאה בהוספה לעגלה' };
         }
       } else {
+        console.log('Adding to cart (guest):', product.name);
         // Handle local cart
         const existingItem = cartItems.find(item => item.product._id === product._id);
         let newCart;
-        
+
         if (existingItem) {
           newCart = cartItems.map(item =>
             item.product._id === product._id
@@ -86,7 +115,7 @@ export const CartProvider = ({ children }) => {
         } else {
           newCart = [...cartItems, { product, quantity, _id: Date.now().toString() }];
         }
-        
+
         setCartItems(newCart);
         setCartCount(newCart.length);
         await saveLocalCart(newCart);
@@ -94,15 +123,25 @@ export const CartProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
-      return { success: false, message: 'שגיאה בהוספה לעגלה' };
+      console.error('Error response:', error.response?.data);
+      return { success: false, message: error.response?.data?.error || 'שגיאה בהוספה לעגלה' };
     }
   };
 
   const updateQuantity = async (itemId, quantity) => {
     try {
       if (user && token) {
-        const response = await cartAPI.updateQuantity(itemId, quantity);
-        if (response.data.success) {
+        // Use quantity-inc or quantity-dec endpoints
+        const currentItem = cartItems.find(item => item._id === itemId);
+        if (!currentItem) return { success: false };
+
+        const endpoint = quantity > currentItem.quantity
+          ? `/home/product/quantity-inc/${itemId}`
+          : `/home/product/quantity-dec/${itemId}`;
+
+        const response = await api.put(endpoint);
+
+        if (response.data.message) {
           await loadCart();
           return { success: true };
         }
@@ -123,8 +162,11 @@ export const CartProvider = ({ children }) => {
   const removeFromCart = async (itemId) => {
     try {
       if (user && token) {
-        const response = await cartAPI.removeFromCart(itemId);
-        if (response.data.success) {
+        console.log('Removing from cart:', itemId);
+        const response = await api.delete(`/home/product/delete-card-products/${itemId}`);
+        console.log('Remove response:', response.data);
+
+        if (response.data.message === 'Product Remove Successfully') {
           await loadCart();
           return { success: true };
         }
@@ -144,11 +186,12 @@ export const CartProvider = ({ children }) => {
   const clearCart = async () => {
     try {
       if (user && token) {
-        const response = await cartAPI.clearCart();
-        if (response.data.success) {
-          setCartItems([]);
-          setCartCount(0);
+        // Delete all cart items one by one
+        for (const item of cartItems) {
+          await api.delete(`/home/product/delete-card-products/${item._id}`);
         }
+        setCartItems([]);
+        setCartCount(0);
       } else {
         setCartItems([]);
         setCartCount(0);

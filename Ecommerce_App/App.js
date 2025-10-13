@@ -10,6 +10,7 @@ import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/Recentl
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ChatBotScreen from './src/screens/ChatBotScreen';
 import FloatingChatButton from './src/components/FloatingChatButton';
+import GlobalFloatingChatButton from './src/components/GlobalFloatingChatButton';
 import getProductImageSource from './src/utils/image';
 
 
@@ -635,8 +636,7 @@ function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* Floating AI Chat Button */}
-      <FloatingChatButton />
+
 
     </ScrollView>
   );
@@ -1183,6 +1183,16 @@ function MainTabs() {
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
+  );
+}
+
+// Wrapper component for MainTabs with floating chat button
+function MainTabsWithChat() {
+  return (
+    <View style={{ flex: 1 }}>
+      <MainTabs />
+      <GlobalFloatingChatButton />
+    </View>
   );
 }
 
@@ -1993,7 +2003,7 @@ export default function App() {
           />
           <Stack.Screen
             name="Main"
-            component={MainTabs}
+            component={MainTabsWithChat}
             options={{ headerShown: false }}
           />
           <Stack.Screen

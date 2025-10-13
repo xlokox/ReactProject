@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,43 +6,69 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { add_to_card, add_to_wishlist } from '../store/reducers/cardReducer';
+import { useCart } from '../context/CartContext';
 import getProductImageSource from '../utils/image';
 
 export default function Products({ title, products, navigation }) {
-  const dispatch = useDispatch();
   const { userInfo } = useSelector(state => state.auth);
+  const { addToCart: addToCartContext } = useCart();
+  const [loadingProductId, setLoadingProductId] = useState(null);
 
-  const addToCart = (product) => {
-    if (userInfo) {
-      dispatch(add_to_card({
-        userId: userInfo.id,
-        quantity: 1,
-        productId: product._id
-      }));
-    } else {
-      navigation.navigate('Login');
+  const addToCart = async (product) => {
+    console.log('🛒 Add to Cart clicked!');
+    console.log('User Info:', userInfo);
+    console.log('Product:', product.name);
+
+    if (!userInfo) {
+      console.log('❌ User not logged in');
+      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'התחבר', onPress: () => navigation.navigate('Login') }
+      ]);
+      return;
+    }
+
+    try {
+      console.log('✅ User is logged in, adding to cart...');
+      setLoadingProductId(product._id);
+      const result = await addToCartContext(product, 1);
+
+      console.log('Cart result:', result);
+
+      if (result && result.success) {
+        console.log('✅ Product added successfully!');
+        Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
+          { text: 'המשך קניות', style: 'cancel' },
+          { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
+        ]);
+      } else {
+        console.log('❌ Failed to add product:', result?.message);
+        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
+      }
+    } catch (error) {
+      console.error('❌ Error adding to cart:', error);
+      console.error('Error details:', error.message);
+      Alert.alert('שגיאה', 'אירעה שגיאה בהוספת המוצר לעגלה: ' + error.message);
+    } finally {
+      setLoadingProductId(null);
     }
   };
 
   const addToWishlist = (product) => {
-    if (userInfo) {
-      dispatch(add_to_wishlist({
-        userId: userInfo.id,
-        productId: product._id,
-        name: product.name,
-        price: product.price,
-        image: product.images[0],
-        discount: product.discount,
-        rating: product.rating,
-        slug: product.slug
-      }));
-    } else {
-      navigation.navigate('Login');
+    if (!userInfo) {
+      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים למועדפים', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'התחבר', onPress: () => navigation.navigate('Login') }
+      ]);
+      return;
     }
+
+    Alert.alert('הצלחה!', 'המוצר נוסף למועדפים');
   };
 
   const renderProduct = ({ item }) => (
@@ -90,18 +116,23 @@ export default function Products({ title, products, navigation }) {
         </View>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => addToWishlist(item)}
           >
             <Ionicons name="heart-outline" size={16} color="#059473" />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => addToCart(item)}
+            disabled={loadingProductId === item._id}
           >
-            <Ionicons name="bag-add-outline" size={16} color="#059473" />
+            {loadingProductId === item._id ? (
+              <ActivityIndicator size="small" color="#059473" />
+            ) : (
+              <Ionicons name="bag-add-outline" size={16} color="#059473" />
+            )}
           </TouchableOpacity>
         </View>
       </View>

@@ -26,6 +26,12 @@ export default function CheckoutScreen({ navigation }) {
     zipCode: '',
     country: 'ישראל',
   });
+  const [creditCard, setCreditCard] = useState({
+    cardNumber: '',
+    cardHolder: '',
+    expiryDate: '',
+    cvv: '',
+  });
 
   const handlePlaceOrder = async () => {
     if (!shippingAddress.street || !shippingAddress.city) {
@@ -33,25 +39,55 @@ export default function CheckoutScreen({ navigation }) {
       return;
     }
 
+    // Validate credit card details if credit card payment is selected
+    if (paymentMethod === 'credit_card') {
+      if (!creditCard.cardNumber || !creditCard.cardHolder || !creditCard.expiryDate || !creditCard.cvv) {
+        Alert.alert('שגיאה', 'אנא מלא את כל פרטי כרטיס האשראי');
+        return;
+      }
+      // Basic card number validation (should be 16 digits)
+      if (creditCard.cardNumber.replace(/\s/g, '').length !== 16) {
+        Alert.alert('שגיאה', 'מספר כרטיס אשראי לא תקין');
+        return;
+      }
+      // Basic CVV validation (should be 3 digits)
+      if (creditCard.cvv.length !== 3) {
+        Alert.alert('שגיאה', 'CVV לא תקין');
+        return;
+      }
+    }
+
     try {
       setLoading(true);
-      
-      // Create order
+
+      // Prepare order data in the format expected by the backend
       const orderData = {
-        items: cartItems.map(item => ({
-          product_id: item.product._id,
-          quantity: item.quantity,
-          price: item.product.price,
-        })),
-        shipping_address: shippingAddress,
-        payment_method: paymentMethod,
-        total_amount: getCartTotal(),
+        userId: cartItems[0]?.userId || 'guest', // Get userId from cart items
+        price: getCartTotal(),
+        shipping_fee: 0, // You can calculate shipping fee if needed
+        shippingInfo: `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.zipCode}, ${shippingAddress.country}`,
+        products: [{
+          sellerId: cartItems[0]?.product?.sellerId || '507f1f77bcf86cd799439011', // Default seller ID
+          price: getCartTotal(),
+          products: cartItems.map(item => ({
+            productInfo: {
+              _id: item.product._id,
+              name: item.product.name,
+              price: item.product.price,
+              images: item.product.images || [],
+              slug: item.product.slug || item.product.name.toLowerCase().replace(/\s+/g, '-'),
+            },
+            quantity: item.quantity,
+            _id: item._id
+          }))
+        }]
       };
 
-      const orderResponse = await api.post('/order/place-order', orderData);
+      console.log('Placing order with data:', orderData);
+      const orderResponse = await api.post('/home/order/place-order', orderData);
 
-      if (orderResponse.data?.success) {
-        const orderId = orderResponse.data.order?._id;
+      if (orderResponse.data?.message === 'Order Placed Successfully') {
+        const orderId = orderResponse.data.orderId;
 
         // Process payment
         const paymentData = {
@@ -64,7 +100,7 @@ export default function CheckoutScreen({ navigation }) {
 
         if (paymentResponse.data?.success) {
           await clearCart();
-          
+
           Alert.alert(
             'הזמנה בוצעה בהצלחה!',
             'ההזמנה שלך התקבלה ותעובד בקרוב',
@@ -81,14 +117,15 @@ export default function CheckoutScreen({ navigation }) {
             ]
           );
         } else {
-          Alert.alert('שגיאה בתשלום', paymentResponse.data.message);
+          Alert.alert('שגיאה בתשלום', paymentResponse.data.message || 'תשלום נכשל');
         }
       } else {
-        Alert.alert('שגיאה', orderResponse.data.message);
+        Alert.alert('שגיאה', orderResponse.data.message || 'ההזמנה נכשלה');
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      Alert.alert('שגיאה', 'אירעה שגיאה בעיבוד ההזמנה');
+      console.error('Error response:', error.response?.data);
+      Alert.alert('שגיאה', error.response?.data?.message || 'אירעה שגיאה בעיבוד ההזמנה');
     } finally {
       setLoading(false);
     }
@@ -150,7 +187,7 @@ export default function CheckoutScreen({ navigation }) {
       <Card style={styles.card}>
         <Card.Content>
           <Title>אמצעי תשלום</Title>
-          
+
           <RadioButton.Group
             onValueChange={setPaymentMethod}
             value={paymentMethod}
@@ -159,17 +196,78 @@ export default function CheckoutScreen({ navigation }) {
               <RadioButton value="credit_card" />
               <Paragraph>כרטיס אשראי</Paragraph>
             </View>
-            
+
             <View style={styles.radioItem}>
               <RadioButton value="paypal" />
               <Paragraph>PayPal</Paragraph>
             </View>
-            
+
             <View style={styles.radioItem}>
               <RadioButton value="cash_on_delivery" />
               <Paragraph>תשלום במזומן בעת המסירה</Paragraph>
             </View>
           </RadioButton.Group>
+
+          {/* Credit Card Details - Show only when credit card is selected */}
+          {paymentMethod === 'credit_card' && (
+            <View style={styles.creditCardSection}>
+              <TextInput
+                label="מספר כרטיס אשראי"
+                value={creditCard.cardNumber}
+                onChangeText={(text) => {
+                  // Format card number with spaces every 4 digits
+                  const formatted = text.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
+                  setCreditCard({...creditCard, cardNumber: formatted});
+                }}
+                mode="outlined"
+                style={styles.input}
+                keyboardType="numeric"
+                maxLength={19} // 16 digits + 3 spaces
+                placeholder="1234 5678 9012 3456"
+              />
+
+              <TextInput
+                label="שם בעל הכרטיס"
+                value={creditCard.cardHolder}
+                onChangeText={(text) => setCreditCard({...creditCard, cardHolder: text})}
+                mode="outlined"
+                style={styles.input}
+                placeholder="ישראל ישראלי"
+              />
+
+              <View style={styles.cardDetailsRow}>
+                <TextInput
+                  label="תוקף (MM/YY)"
+                  value={creditCard.expiryDate}
+                  onChangeText={(text) => {
+                    // Format expiry date as MM/YY
+                    let formatted = text.replace(/\D/g, '');
+                    if (formatted.length >= 2) {
+                      formatted = formatted.slice(0, 2) + '/' + formatted.slice(2, 4);
+                    }
+                    setCreditCard({...creditCard, expiryDate: formatted});
+                  }}
+                  mode="outlined"
+                  style={[styles.input, styles.halfInput]}
+                  keyboardType="numeric"
+                  maxLength={5}
+                  placeholder="12/25"
+                />
+
+                <TextInput
+                  label="CVV"
+                  value={creditCard.cvv}
+                  onChangeText={(text) => setCreditCard({...creditCard, cvv: text.replace(/\D/g, '')})}
+                  mode="outlined"
+                  style={[styles.input, styles.halfInput]}
+                  keyboardType="numeric"
+                  maxLength={3}
+                  placeholder="123"
+                  secureTextEntry
+                />
+              </View>
+            </View>
+          )}
         </Card.Content>
       </Card>
 
@@ -217,5 +315,19 @@ const styles = StyleSheet.create({
   orderButton: {
     margin: 16,
     paddingVertical: 8,
+  },
+  creditCardSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  cardDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  halfInput: {
+    flex: 1,
   },
 });

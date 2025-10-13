@@ -7,28 +7,45 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 
 /**
- * FloatingChatButton - A floating action button that opens the AI chatbot
- * This component can be added to any screen to provide quick access to the chatbot
+ * GlobalFloatingChatButton - A floating chat button that appears on all screens
+ * Follows the user as they navigate and scroll through the app
  */
-export default function FloatingChatButton({ style }) {
+export default function GlobalFloatingChatButton() {
   const navigation = useNavigation();
   const [scaleValue] = useState(new Animated.Value(1));
+  const [isVisible, setIsVisible] = useState(true);
+
+  // Get current route name safely
+  const currentRouteName = useNavigationState(state => {
+    if (!state) return null;
+    const route = state.routes[state.index];
+    return route?.name;
+  });
 
   useEffect(() => {
+    // Hide on ChatBot screen to avoid confusion
+    if (currentRouteName) {
+      setIsVisible(currentRouteName !== 'ChatBot');
+    }
+  }, [currentRouteName]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
     // Pulse animation to draw attention
     const pulseAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(scaleValue, {
           toValue: 1.1,
-          duration: 1000,
+          duration: 2000,
           useNativeDriver: true,
         }),
         Animated.timing(scaleValue, {
           toValue: 1,
-          duration: 1000,
+          duration: 2000,
           useNativeDriver: true,
         }),
       ])
@@ -37,7 +54,7 @@ export default function FloatingChatButton({ style }) {
     pulseAnimation.start();
 
     return () => pulseAnimation.stop();
-  }, []);
+  }, [isVisible]);
 
   const handlePress = () => {
     // Haptic feedback on press (if available)
@@ -48,11 +65,12 @@ export default function FloatingChatButton({ style }) {
     navigation.navigate('ChatBot');
   };
 
+  if (!isVisible) return null;
+
   return (
     <Animated.View
       style={[
         styles.container,
-        style,
         {
           transform: [{ scale: scaleValue }],
         },
@@ -65,7 +83,7 @@ export default function FloatingChatButton({ style }) {
       >
         <View style={styles.iconContainer}>
           <Ionicons name="chatbubbles" size={28} color="#fff" />
-          {/* Notification badge (optional - can be connected to unread messages) */}
+          {/* Notification badge */}
           <View style={styles.badge}>
             <View style={styles.badgeDot} />
           </View>
@@ -81,6 +99,7 @@ const styles = StyleSheet.create({
     bottom: 90, // Above bottom navigation
     right: 20,
     zIndex: 9999, // Very high z-index to appear above everything
+    elevation: 10, // Android shadow
   },
   button: {
     width: 60,
@@ -119,4 +138,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF5252',
   },
 });
-
