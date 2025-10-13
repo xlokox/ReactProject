@@ -65,13 +65,27 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
+      console.log('📝 Registering user:', userData.email);
       const { data } = await api.post('/customer/register', userData);
+
+      console.log('Registration response:', data);
+
+      // If registration successful and returns token, log the user in automatically
+      if (data?.token && data?.userInfo) {
+        await AsyncStorage.setItem('customerToken', data.token);
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+        setToken(data.token);
+        setUser(data.userInfo);
+        console.log('✅ User registered and logged in automatically');
+      }
+
       return { success: !!data, message: data?.message || 'הרשמה בוצעה בהצלחה' };
     } catch (error) {
-      console.error('Register error:', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'שגיאה בהרשמה' 
+      console.error('❌ Register error:', error);
+      console.error('Error response:', error.response?.data);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.response?.data?.message || 'שגיאה בהרשמה'
       };
     } finally {
       setLoading(false);

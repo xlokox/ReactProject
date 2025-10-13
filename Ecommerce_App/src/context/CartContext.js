@@ -38,7 +38,7 @@ export const CartProvider = ({ children }) => {
     try {
       setLoading(true);
       console.log('Loading cart for user:', user.id);
-      const response = await api.get('/home/product/get-card-product/' + user.id);
+      const response = await api.get('/home/product/get-card-products/' + user.id);
       console.log('Cart response:', response.data);
 
       if (response.data.card_products) {
@@ -60,11 +60,13 @@ export const CartProvider = ({ children }) => {
     } catch (error) {
       console.error('Error loading cart:', error);
       console.error('Error response:', error.response?.data);
-      loadLocalCart();
+      // Fallback to empty cart on error
+      setCartItems([]);
+      setCartCount(0);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, loadLocalCart]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user && token) {
@@ -72,7 +74,8 @@ export const CartProvider = ({ children }) => {
     } else {
       loadLocalCart();
     }
-  }, [user, token, loadCart, loadLocalCart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, token]);
 
   const saveLocalCart = async (cart) => {
     try {

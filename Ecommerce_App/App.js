@@ -7,6 +7,10 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { RecentlyViewedProvider, useRecentlyViewed } from './src/context/RecentlyViewedContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { CartProvider } from './src/context/CartContext';
+import RealLoginScreen from './src/screens/LoginScreen';
+import RealRegisterScreen from './src/screens/RegisterScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ChatBotScreen from './src/screens/ChatBotScreen';
 import FloatingChatButton from './src/components/FloatingChatButton';
@@ -173,7 +177,9 @@ function HomeScreen({ navigation }) {
   const [categories, setCategories] = React.useState([]);
   const [selectedCategory, setSelectedCategory] = React.useState('All Category');
   const [searchValue, setSearchValue] = React.useState('');
-  const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
+  // const { recentlyViewed, addToRecentlyViewed } = useRecentlyViewed();
+  const recentlyViewed = [];
+  const addToRecentlyViewed = () => {};
 
 
   // Mobile hero banners - loaded from backend, with placeholders when empty
@@ -760,7 +766,8 @@ function ProductsScreen({ navigation, route }) {
 // Product Detail Screen - ENHANCED WITH "PEOPLE ALSO LIKE"
 function ProductDetailScreen({ navigation, route }) {
   const { product } = route.params;
-  const { addToRecentlyViewed } = useRecentlyViewed();
+  // const { addToRecentlyViewed } = useRecentlyViewed();
+  const addToRecentlyViewed = () => {};
   const [suggestedProducts, setSuggestedProducts] = useState([]);
   const [currentSuggestionIndex, setCurrentSuggestionIndex] = useState(0);
   const suggestionRef = useRef(null);
@@ -770,7 +777,8 @@ function ProductDetailScreen({ navigation, route }) {
     if (product) {
       addToRecentlyViewed(product);
     }
-  }, [product, addToRecentlyViewed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?._id]);
 
   // Generate "People also like" products - mix from different categories
   useEffect(() => {
@@ -1030,42 +1038,40 @@ function CartScreen({ navigation }) {
 
 // Profile Screen - ENHANCED WITH REAL USER DATA
 function ProfileScreen({ navigation }) {
-  const [user, setUser] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const { user, logout, loading: authLoading } = useAuth();
+  const [loading, setLoading] = React.useState(false);
 
+  console.log('ProfileScreen - User:', user);
+
+  // Redirect to Login if no user
   React.useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoading(false);
+    if (!authLoading && !user) {
+      console.log('⚠️ No user found, redirecting to Login...');
+      navigation.replace('Login');
     }
-  };
+  }, [user, authLoading, navigation]);
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
-      navigation.navigate('Login');
+      console.log('Logging out...');
+      await logout();
+      navigation.replace('Login');
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#059473" />
       </View>
     );
+  }
+
+  // If no user, show nothing (will redirect)
+  if (!user) {
+    return null;
   }
 
   return (
@@ -1093,8 +1099,8 @@ function ProfileScreen({ navigation }) {
             <Ionicons name="camera" size={12} color="#ffffff" />
           </View>
         </TouchableOpacity>
-        <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
-        <Text style={styles.userEmail}>{user?.email || 'guest@example.com'}</Text>
+        <Text style={styles.userName}>{user?.name}</Text>
+        <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
 
       <View style={styles.menuSection}>
@@ -1976,29 +1982,31 @@ function RegisterScreen({ navigation }) {
 
 export default function App() {
   return (
-    <RecentlyViewedProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator
-          initialRouteName="Main"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#059473',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-          }}
-        >
+    <AuthProvider>
+      <CartProvider>
+        {/* <RecentlyViewedProvider> */}
+          <NavigationContainer>
+            <StatusBar style="light" />
+            <Stack.Navigator
+              initialRouteName="Login"
+              screenOptions={{
+                headerStyle: {
+                  backgroundColor: '#059473',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
           <Stack.Screen
             name="Login"
-            component={LoginScreen}
+            component={RealLoginScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Register"
-            component={RegisterScreen}
+            component={RealRegisterScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen
@@ -2038,7 +2046,9 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-    </RecentlyViewedProvider>
+        {/* </RecentlyViewedProvider> */}
+      </CartProvider>
+    </AuthProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,18 +8,16 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-import { customer_login, messageClear } from '../store/reducers/authReducer';
-import Toast from 'react-native-toast-message';
+import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
-  const dispatch = useDispatch();
-  const { loader, errorMessage, successMessage, userInfo } = useSelector(state => state.auth);
+  const { login: authLogin, loading } = useAuth();
 
   const [state, setState] = useState({
     email: '',
@@ -33,43 +31,35 @@ export default function LoginScreen({ navigation }) {
     });
   };
 
-  const login = () => {
+  const login = async () => {
+    console.log('🔐 Login button clicked');
+    console.log('Email:', state.email);
+    console.log('Password:', state.password ? '***' : 'empty');
+
     if (!state.email || !state.password) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please fill all fields'
-      });
+      Alert.alert('Error', 'Please fill all fields');
       return;
     }
-    dispatch(customer_login(state));
-  };
 
-  useEffect(() => {
-    if (successMessage) {
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: successMessage
-      });
-      dispatch(messageClear());
+    console.log('✅ Calling login API...');
+    const result = await authLogin(state.email, state.password);
+
+    console.log('Login result:', result);
+
+    if (result.success) {
+      console.log('✅ Login successful! Navigating to Main...');
+      Alert.alert('Success', 'Login successful!', [
+        { text: 'OK', onPress: () => navigation.replace('Main') }
+      ]);
+    } else {
+      console.log('❌ Login failed:', result.message);
+      Alert.alert('Error', result.message || 'Login failed');
     }
-    if (errorMessage) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: errorMessage
-      });
-      dispatch(messageClear());
-    }
-    if (userInfo) {
-      navigation.replace('Main');
-    }
-  }, [successMessage, errorMessage, userInfo, navigation, dispatch]);
+  };
 
   return (
     <View style={styles.container}>
-      {loader && (
+      {loading && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#059473" />
         </View>

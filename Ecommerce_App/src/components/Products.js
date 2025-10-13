@@ -9,22 +9,22 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import getProductImageSource from '../utils/image';
 
 export default function Products({ title, products, navigation }) {
-  const { userInfo } = useSelector(state => state.auth);
+  const { user } = useAuth();
   const { addToCart: addToCartContext } = useCart();
   const [loadingProductId, setLoadingProductId] = useState(null);
 
   const addToCart = async (product) => {
     console.log('🛒 Add to Cart clicked!');
-    console.log('User Info:', userInfo);
+    console.log('User:', user);
     console.log('Product:', product.name);
 
-    if (!userInfo) {
+    if (!user) {
       console.log('❌ User not logged in');
       Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
         { text: 'ביטול', style: 'cancel' },
@@ -60,7 +60,7 @@ export default function Products({ title, products, navigation }) {
   };
 
   const addToWishlist = (product) => {
-    if (!userInfo) {
+    if (!user) {
       Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים למועדפים', [
         { text: 'ביטול', style: 'cancel' },
         { text: 'התחבר', onPress: () => navigation.navigate('Login') }

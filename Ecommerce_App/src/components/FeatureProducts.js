@@ -10,20 +10,25 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import getProductImageSource from '../utils/image';
 
 const { width } = Dimensions.get('window');
 
 export default function FeatureProducts({ products, navigation }) {
-  const { userInfo } = useSelector(state => state.auth);
+  const { user } = useAuth();
   const { addToCart: addToCartContext } = useCart();
   const [loadingProductId, setLoadingProductId] = useState(null);
 
   const addToCart = async (product) => {
-    if (!userInfo) {
+    console.log('🛒 Add to Cart clicked (Feature Products)!');
+    console.log('User:', user);
+    console.log('Product:', product.name);
+
+    if (!user) {
+      console.log('❌ User not logged in');
       Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
         { text: 'ביטול', style: 'cancel' },
         { text: 'התחבר', onPress: () => navigation.navigate('Login') }
@@ -32,27 +37,33 @@ export default function FeatureProducts({ products, navigation }) {
     }
 
     try {
+      console.log('✅ User is logged in, adding to cart...');
       setLoadingProductId(product._id);
       const result = await addToCartContext(product, 1);
 
-      if (result.success) {
+      console.log('Cart result:', result);
+
+      if (result && result.success) {
+        console.log('✅ Product added successfully!');
         Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
           { text: 'המשך קניות', style: 'cancel' },
           { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
         ]);
       } else {
-        Alert.alert('שגיאה', result.message || 'לא ניתן להוסיף את המוצר לעגלה');
+        console.log('❌ Failed to add product:', result?.message);
+        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
-      Alert.alert('שגיאה', 'אירעה שגיאה בהוספת המוצר לעגלה');
+      console.error('❌ Error adding to cart:', error);
+      console.error('Error details:', error.message);
+      Alert.alert('שגיאה', 'אירעה שגיאה בהוספת המוצר לעגלה: ' + error.message);
     } finally {
       setLoadingProductId(null);
     }
   };
 
   const addToWishlist = (product) => {
-    if (!userInfo) {
+    if (!user) {
       Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים למועדפים', [
         { text: 'ביטול', style: 'cancel' },
         { text: 'התחבר', onPress: () => navigation.navigate('Login') }
