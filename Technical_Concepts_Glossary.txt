@@ -1,0 +1,3167 @@
+================================================================================
+                    Technical Concepts Glossary - E-Commerce Project
+================================================================================
+
+Author: Daniel Knafel
+Date: October 18, 2025
+Project: EasyShop - Full-Stack E-Commerce Platform
+
+================================================================================
+                              TABLE OF CONTENTS
+================================================================================
+
+0. FUNDAMENTAL CONCEPTS - Architecture Overview
+1. Core JavaScript/Node.js Concepts
+2. Redux Toolkit - State Management (EXPANDED)
+3. React & React Native - User Interface (EXPANDED)
+4. Backend - Express.js & Node.js (EXPANDED)
+5. HTTP & API - Client-Server Communication (EXPANDED)
+6. MongoDB & Mongoose - Database (EXPANDED)
+7. Authentication & Security (EXPANDED)
+8. Additional Libraries and Tools
+
+================================================================================
+              0. FUNDAMENTAL CONCEPTS - ARCHITECTURE OVERVIEW
+================================================================================
+
+This section explains the core architectural concepts that form the foundation
+of my e-commerce project. Understanding these concepts is essential to
+understanding how all the pieces fit together.
+
+--------------------------------------------------------------------------------
+What is a Controller? (Backend MVC Pattern)
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+A Controller is a JavaScript class or object that contains methods (functions)
+that handle business logic for specific routes in my Express.js backend. It's
+the "C" in the MVC (Model-View-Controller) pattern.
+
+In my project:
+- Model = MongoDB schemas (customerModel, productModel, orderModel)
+- View = React/React Native frontend (what users see)
+- Controller = Business logic (customerAuthController, orderController, etc.)
+
+Why I used it:
+--------------
+I organized my backend into Controllers because:
+1. Separation of concerns - Routes define endpoints, Controllers handle logic
+2. Code organization - All authentication logic in one controller
+3. Reusability - I can call controller methods from different routes
+4. Testability - Easier to test business logic separately
+5. Maintainability - Easy to find and update specific functionality
+
+How it works:
+-------------
+Flow: HTTP Request → Route → Controller → Model → Database → Controller → Response
+
+```
+Client sends request
+         ↓
+Express Route (/api/customer/login)
+         ↓
+Controller Method (customerAuthController.customer_login)
+         ↓
+Business Logic (validate, hash password, etc.)
+         ↓
+Model Query (customerModel.findOne)
+         ↓
+MongoDB Database
+         ↓
+Return data to Controller
+         ↓
+Controller sends Response
+         ↓
+Client receives response
+```
+
+How it connects to other parts:
+--------------------------------
+- Routes import and call Controller methods
+- Controllers import and use Models (Mongoose)
+- Controllers use middleware (authMiddleware, optionalAuthMiddleware)
+- Controllers return responses using responseReturn utility
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/routes/home/customerAuthRoutes.js
+import { Router } from 'express';
+import customerAuthController from '../../controllers/home/customerAuthController.js';
+
+const router = Router();
+
+// Route defines the endpoint, Controller handles the logic
+router.post('/customer/register', customerAuthController.customer_register);
+router.post('/customer/login', customerAuthController.customer_login);
+
+export default router;
+```
+
+```javascript
+// File: Ecommerce/backend/controllers/home/customerAuthController.js
+class customerAuthController {
+  // Controller method - contains all the business logic
+  customer_login = async (req, res) => {
+    try {
+      // 1. Extract data from request
+      const { email, password } = req.body;
+
+      // 2. Validate input
+      if (!email || !password) {
+        return responseReturn(res, 400, { error: 'All fields are required' });
+      }
+
+      // 3. Query database using Model
+      const customer = await customerModel.findOne({ email: email.trim() });
+
+      // 4. Business logic (password verification)
+      if (!customer) {
+        return responseReturn(res, 404, { error: 'Invalid email or password' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, customer.password);
+
+      if (!isPasswordValid) {
+        return responseReturn(res, 401, { error: 'Invalid email or password' });
+      }
+
+      // 5. Generate token
+      const token = createToken({ id: customer.id, name: customer.name });
+
+      // 6. Send response
+      return responseReturn(res, 200, {
+        message: 'Login successful',
+        token,
+        userInfo: { id: customer.id, name: customer.name, email: customer.email }
+      });
+
+    } catch (error) {
+      console.error('Login Error:', error);
+      return responseReturn(res, 500, { error: 'Internal Server Error' });
+    }
+  };
+}
+
+export default new customerAuthController();
+```
+
+Code explanation:
+- The Route only defines the endpoint (/customer/login) and which controller to call
+- The Controller contains ALL the business logic (validation, database queries, etc.)
+- This separation makes the code clean and maintainable
+
+--------------------------------------------------------------------------------
+What is State? (Application Data That Changes Over Time)
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+State is data in my application that can change over time and affects what the
+user sees. When state changes, the UI automatically updates to reflect the new
+data.
+
+Types of state in my project:
+1. **Local State** (useState) - Data specific to one component
+2. **Global State** (Redux) - Data shared across multiple components
+3. **Persistent State** (AsyncStorage + Redux Persist) - Data saved between app sessions
+
+Why I used it:
+--------------
+I use state management because:
+1. The UI needs to react to data changes (user logs in → show user name)
+2. Multiple components need access to the same data (cart count in header)
+3. Data needs to persist between app sessions (stay logged in)
+4. API responses need to update the UI (products loaded → display products)
+
+How it works:
+-------------
+State Flow in my application:
+
+```
+User Action (click login button)
+         ↓
+Event Handler (handleLogin)
+         ↓
+Update State (dispatch Redux action or setState)
+         ↓
+State Changes
+         ↓
+React Detects Change
+         ↓
+Component Re-renders
+         ↓
+UI Updates (show logged-in user)
+```
+
+Example from my project:
+------------------------
+```javascript
+// LOCAL STATE (useState) - Only this component uses it
+// File: Ecommerce_App/src/screens/LoginScreen.js
+const [state, setState] = useState({
+  email: '',
+  password: ''
+});
+
+const inputHandle = (name, value) => {
+  setState({
+    ...state,
+    [name]: value  // Update state → component re-renders → input shows new value
+  });
+};
+```
+
+```javascript
+// GLOBAL STATE (Redux) - Multiple components use it
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    userInfo: null,  // State: user information
+    token: null,     // State: authentication token
+    loader: false    // State: loading indicator
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(customer_login.fulfilled, (state, { payload }) => {
+        // Update state when login succeeds
+        state.userInfo = payload.userInfo;
+        state.token = payload.token;
+        state.loader = false;
+        // All components using this state will re-render automatically!
+      });
+  }
+});
+```
+
+```javascript
+// READING STATE in a component
+// File: Ecommerce_App/src/components/Header.js
+const { userInfo } = useSelector((state) => state.auth);
+
+// When userInfo state changes, this component automatically re-renders
+return (
+  <View>
+    {userInfo ? (
+      <Text>Welcome, {userInfo.name}!</Text>
+    ) : (
+      <Text>Please login</Text>
+    )}
+  </View>
+);
+```
+
+Code explanation:
+- Local state (useState) is for data only one component needs
+- Global state (Redux) is for data multiple components need
+- When state changes, React automatically re-renders affected components
+- This creates a reactive UI that always reflects the current data
+
+--------------------------------------------------------------------------------
+What is a Component? (React/React Native Building Blocks)
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+A Component is a reusable piece of UI in React/React Native. It's like a
+JavaScript function that returns JSX (UI markup). Components can be simple
+(just display data) or complex (handle logic and state).
+
+Types of components in my project:
+1. **Screen Components** - Full pages (LoginScreen, HomeScreen, CartScreen)
+2. **Reusable Components** - Smaller pieces used in multiple places (Header, Footer, ProductCard)
+3. **Functional Components** - Modern React components using hooks
+
+Why I used it:
+--------------
+I built my entire UI using components because:
+1. Reusability - Write once, use everywhere (Header component on every screen)
+2. Maintainability - Update one component, all usages update
+3. Organization - Each component has a specific purpose
+4. Composition - Combine small components to build complex UIs
+
+How it works:
+-------------
+Component Lifecycle:
+```
+Component Created
+         ↓
+Initial Render (JSX → UI)
+         ↓
+useEffect runs (fetch data, setup listeners)
+         ↓
+State/Props Change
+         ↓
+Component Re-renders
+         ↓
+UI Updates
+         ↓
+Component Unmounts (cleanup)
+```
+
+How it connects to other parts:
+--------------------------------
+- Components use Redux (useSelector, useDispatch)
+- Components use React Navigation (useNavigation)
+- Components receive props from parent components
+- Components manage local state with useState
+- Components trigger API calls via Redux actions
+
+Example from my project:
+------------------------
+```javascript
+// REUSABLE COMPONENT
+// File: Ecommerce_App/src/components/Header.js
+export default function Header({ navigation }) {
+  // Connect to Redux state
+  const { userInfo } = useSelector((state) => state.auth);
+  const { card_product_count } = useSelector((state) => state.card);
+
+  return (
+    <View style={styles.header}>
+      <Text style={styles.logo}>EasyShop</Text>
+
+      {/* Cart icon with badge */}
+      <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
+        <Ionicons name="cart-outline" size={24} />
+        {card_product_count > 0 && (
+          <View style={styles.badge}>
+            <Text>{card_product_count}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* User menu */}
+      {userInfo ? (
+        <Text>Welcome, {userInfo.name}</Text>
+      ) : (
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text>Login</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+```
+
+```javascript
+// SCREEN COMPONENT (uses Header component)
+// File: Ecommerce_App/src/screens/HomeScreen.js
+export default function HomeScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const { products } = useSelector((state) => state.home);
+
+  useEffect(() => {
+    // Fetch products when component mounts
+    dispatch(get_products());
+  }, [dispatch]);
+
+  return (
+    <ScrollView>
+      {/* Reusable Header component */}
+      <Header navigation={navigation} />
+
+      {/* Display products */}
+      <FlatList
+        data={products}
+        renderItem={({ item }) => <ProductCard product={item} />}
+      />
+    </ScrollView>
+  );
+}
+```
+
+Code explanation:
+- Header is a reusable component used on multiple screens
+- HomeScreen is a screen component that uses Header
+- Components can receive props (navigation) from parent
+- Components can connect to Redux state (useSelector)
+- Components can dispatch Redux actions (useDispatch)
+
+--------------------------------------------------------------------------------
+What is a Reducer? (Redux State Management Function)
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+A Reducer is a pure function that takes the current state and an action, and
+returns a new state. It's the ONLY way to update Redux state. The name comes
+from the JavaScript array.reduce() method.
+
+Reducer signature: (state, action) => newState
+
+Why I used it:
+--------------
+I use reducers in Redux because:
+1. Centralized state updates - All state changes go through reducers
+2. Predictable - Same input always produces same output
+3. Debuggable - I can see exactly what changed and why
+4. Time-travel debugging - Can replay actions to see state changes
+
+How it works:
+-------------
+Reducer Flow:
+```
+Component dispatches action
+         ↓
+dispatch(customer_login(data))
+         ↓
+Action sent to Reducer
+         ↓
+Reducer checks action type
+         ↓
+Reducer updates state (immutably)
+         ↓
+New state returned
+         ↓
+Redux store updated
+         ↓
+Components using that state re-render
+```
+
+Rules I follow for reducers:
+1. **Pure function** - No side effects, no API calls
+2. **Immutable updates** - Never modify state directly, always return new state
+3. **Synchronous** - Reducers must be synchronous (use thunks for async)
+
+How it connects to other parts:
+--------------------------------
+- Reducers receive actions from components (via dispatch)
+- Reducers update Redux store state
+- Components read updated state (via useSelector)
+- createAsyncThunk generates actions that reducers handle
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    loader: false,
+    userInfo: null,
+    token: null,
+    errorMessage: '',
+    successMessage: ''
+  },
+
+  // Regular reducers (synchronous actions)
+  reducers: {
+    messageClear: (state) => {
+      // Immutable update - Redux Toolkit uses Immer internally
+      state.errorMessage = '';
+      state.successMessage = '';
+    }
+  },
+
+  // Extra reducers (handle async thunk actions)
+  extraReducers: (builder) => {
+    builder
+      // Login pending (loading starts)
+      .addCase(customer_login.pending, (state) => {
+        state.loader = true;
+      })
+
+      // Login fulfilled (success)
+      .addCase(customer_login.fulfilled, (state, { payload }) => {
+        state.loader = false;
+        state.userInfo = payload.userInfo;
+        state.token = payload.token;
+        state.successMessage = payload.message;
+      })
+
+      // Login rejected (error)
+      .addCase(customer_login.rejected, (state, { payload }) => {
+        state.loader = false;
+        state.errorMessage = payload?.error || 'Login failed';
+      });
+  }
+});
+
+export default authSlice.reducer;
+```
+
+Code explanation:
+- The reducer handles 3 states for login: pending, fulfilled, rejected
+- Each case updates the state immutably (Redux Toolkit handles this)
+- When state.loader changes to true, loading indicator shows in UI
+- When state.userInfo is set, user name appears in header
+- All state updates are predictable and traceable
+
+--------------------------------------------------------------------------------
+How These Concepts Work Together (MERN Stack Architecture)
+--------------------------------------------------------------------------------
+
+Complete Data Flow in My E-Commerce Project:
+---------------------------------------------
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         REACT NATIVE MOBILE APP                         │
+│                                                                         │
+│  ┌──────────────┐         ┌──────────────┐         ┌──────────────┐  │
+│  │  COMPONENT   │────────▶│    REDUX     │────────▶│  COMPONENT   │  │
+│  │ (LoginScreen)│         │    STORE     │         │   (Header)   │  │
+│  │              │         │              │         │              │  │
+│  │ - User types │         │ - userInfo   │         │ - Reads      │  │
+│  │   email/pwd  │         │ - token      │         │   userInfo   │  │
+│  │ - Clicks     │         │ - loader     │         │ - Shows name │  │
+│  │   login btn  │         │              │         │              │  │
+│  └──────┬───────┘         └──────▲───────┘         └──────────────┘  │
+│         │                        │                                    │
+│         │ dispatch(action)       │ state updated                      │
+│         ▼                        │                                    │
+│  ┌──────────────────────────────┴───────┐                            │
+│  │         REDUX ASYNC THUNK            │                            │
+│  │     (customer_login)                 │                            │
+│  │                                      │                            │
+│  │  1. Dispatch pending action          │                            │
+│  │  2. Call API via Axios               │◀───────────────┐           │
+│  │  3. Dispatch fulfilled/rejected      │                │           │
+│  └──────────────┬───────────────────────┘                │           │
+│                 │                                         │           │
+│                 │ HTTP Request                            │           │
+│                 ▼                                         │           │
+│  ┌─────────────────────────────────────┐                 │           │
+│  │         AXIOS API CLIENT            │                 │           │
+│  │                                     │                 │           │
+│  │  - Request Interceptor              │                 │           │
+│  │    • Add JWT token from AsyncStorage│                 │           │
+│  │    • Add mobile headers             │                 │           │
+│  │  - Response Interceptor             │                 │           │
+│  │    • Handle 401 errors              │                 │           │
+│  │    • Log responses                  │                 │           │
+│  └──────────────┬──────────────────────┘                 │           │
+└─────────────────┼────────────────────────────────────────┼───────────┘
+                  │                                         │
+                  │ POST /api/customer/login                │
+                  ▼                                         │
+┌─────────────────────────────────────────────────────────┐│
+│                    EXPRESS.JS BACKEND                    ││
+│                                                          ││
+│  ┌────────────────────────────────────────────────┐    ││
+│  │              ROUTE HANDLER                     │    ││
+│  │  router.post('/customer/login', ...)           │    ││
+│  └────────────┬───────────────────────────────────┘    ││
+│               │                                         ││
+│               ▼                                         ││
+│  ┌────────────────────────────────────────────────┐    ││
+│  │            CONTROLLER                          │    ││
+│  │  customerAuthController.customer_login()       │    ││
+│  │                                                │    ││
+│  │  1. Extract email, password from req.body      │    ││
+│  │  2. Validate input                             │    ││
+│  │  3. Query database                             │────┼┼──┐
+│  │  4. Compare password (bcrypt)                  │    ││  │
+│  │  5. Generate JWT token                         │    ││  │
+│  │  6. Return response                            │    ││  │
+│  └────────────┬───────────────────────────────────┘    ││  │
+│               │                                         ││  │
+│               │ Response                                ││  │
+│               └─────────────────────────────────────────┼┼──┤
+└─────────────────────────────────────────────────────────┘│  │
+                                                            │  │
+┌───────────────────────────────────────────────────────────┼──┘
+│                    MONGODB DATABASE                       │
+│                                                           │
+│  ┌────────────────────────────────────────────────┐      │
+│  │              MONGOOSE MODEL                    │      │
+│  │  customerModel.findOne({ email })              │      │
+│  │                                                │      │
+│  │  Returns: {                                    │      │
+│  │    _id: "...",                                 │      │
+│  │    name: "John Doe",                           │      │
+│  │    email: "john@example.com",                  │      │
+│  │    password: "$2b$10$hashed..."                │      │
+│  │  }                                             │      │
+│  └────────────────────────────────────────────────┘      │
+└───────────────────────────────────────────────────────────┘
+```
+
+Step-by-Step Flow:
+------------------
+1. **User Action**: User types email/password and clicks login button
+2. **Component**: LoginScreen calls handleLogin function
+3. **Dispatch Action**: dispatch(customer_login({ email, password }))
+4. **Redux Thunk**: customer_login thunk executes
+5. **Pending**: Reducer sets loader: true (loading spinner shows)
+6. **API Call**: Axios sends POST request to /api/customer/login
+7. **Request Interceptor**: Adds headers and logs request
+8. **Express Route**: Receives request, calls controller
+9. **Controller**: Validates input, queries database
+10. **Mongoose Model**: Queries MongoDB for user
+11. **Database**: Returns user document
+12. **Controller**: Compares password, generates JWT
+13. **Response**: Controller sends { token, userInfo, message }
+14. **Response Interceptor**: Logs response
+15. **Thunk**: Receives response, saves token to AsyncStorage
+16. **Fulfilled**: Reducer updates state with userInfo and token
+17. **Component Re-render**: Header component reads new userInfo
+18. **UI Update**: User sees "Welcome, John Doe!" in header
+
+This is how ALL features in my app work - the same flow for products, cart, orders, etc.
+
+================================================================================
+                    1. CORE JAVASCRIPT/NODE.JS CONCEPTS
+================================================================================
+
+--------------------------------------------------------------------------------
+async/await - Asynchronous Functions
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+async/await are JavaScript keywords that allow me to write asynchronous code
+(code that waits for operations like API calls or database queries) in a way
+that looks synchronous and is easy to read.
+
+Why I used it:
+--------------
+I used async/await throughout the entire project because:
+1. MongoDB database API calls take time
+2. OpenAI API calls take time
+3. HTTP requests between mobile app and server take time
+4. The code looks much cleaner and easier to understand than Promises with .then()
+
+How it works:
+-------------
+- async: Marks a function as asynchronous, always returns a Promise
+- await: Pauses execution until the Promise completes, returns the result
+
+Flow diagram:
+```
+Regular function:
+Code 1 → Code 2 → Code 3 (everything immediate)
+
+async/await function:
+Code 1 → await (waiting...) → Code 2 → await (waiting...) → Code 3
+```
+
+How it connects to other parts:
+--------------------------------
+- Used with Mongoose (MongoDB queries)
+- Used with Axios (HTTP requests)
+- Used with bcrypt (password hashing)
+- Used with AsyncStorage (React Native)
+- Used in Redux async thunks
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/home/customerAuthController.js
+async customer_login(req, res) {
+  try {
+    const { email, password } = req.body;
+
+    // await waits until the database query completes
+    const customer = await customerModel.findOne({ email: email.trim() });
+
+    if (!customer) {
+      return responseReturn(res, 404, { error: 'Invalid email or password' });
+    }
+
+    // await waits until the password comparison completes
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+
+    if (!isPasswordValid) {
+      return responseReturn(res, 401, { error: 'Invalid email or password' });
+    }
+
+    const token = createToken({ id: customer.id, name: customer.name });
+    return responseReturn(res, 200, { message: 'Login successful', token });
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+}
+```
+
+Code explanation:
+- I used async to mark the function as asynchronous
+- I used await before customerModel.findOne() because it's an operation that takes time
+- I used await before bcrypt.compare() because it's an operation that takes time
+- If I didn't use await, the code would continue running before the result returns!
+
+--------------------------------------------------------------------------------
+Promises
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+A Promise is a JavaScript object that represents a value that will be available
+in the future. It's like a "promise" that the operation will complete eventually
+and return a result (or an error).
+
+Why I used it:
+--------------
+Every asynchronous operation in my project returns a Promise:
+- API calls with Axios
+- MongoDB queries with Mongoose
+- AsyncStorage calls
+- Redux async thunks
+
+How it works:
+-------------
+A Promise can be in one of three states:
+1. Pending - The operation is still running
+2. Fulfilled - The operation succeeded, there's a result
+3. Rejected - The operation failed, there's an error
+
+Diagram:
+```
+Promise
+   ↓
+Pending (waiting)
+   ↓
+   ├─→ Fulfilled (success) → .then() or await
+   └─→ Rejected (failure) → .catch() or try/catch
+```
+
+How it connects to other parts:
+--------------------------------
+- async/await works with Promises (await waits for a Promise)
+- Redux createAsyncThunk returns a Promise
+- Axios returns a Promise
+- Mongoose queries return Promises
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      // api.post returns a Promise
+      const { data } = await api.post('/customer/login', info);
+
+      // AsyncStorage.setItem returns a Promise
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+      }
+
+      // fulfillWithValue returns a successful Promise
+      return fulfillWithValue(data);
+    } catch (error) {
+      // rejectWithValue returns a failed Promise
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+Code explanation:
+- api.post() returns a Promise, I use await to wait for the result
+- AsyncStorage.setItem() returns a Promise, I use await
+- fulfillWithValue() returns a successful Promise with the data
+- rejectWithValue() returns a failed Promise with the error
+
+--------------------------------------------------------------------------------
+try/catch - Error Handling
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+try/catch is a mechanism for handling errors in JavaScript. The code in try runs,
+and if there's an error, the code in catch catches it and handles it.
+
+Why I used it:
+--------------
+I used try/catch in every asynchronous function because:
+1. API calls can fail (server unavailable, timeout)
+2. MongoDB queries can fail (connection dropped, syntax error)
+3. I want to catch errors and return a clear message to the user
+4. I want to prevent the application from crashing
+
+How it works:
+-------------
+```
+try {
+  // Code that might throw an error
+} catch (error) {
+  // Code that runs if there's an error
+}
+```
+
+How it connects to other parts:
+--------------------------------
+- Used with async/await (catches errors from Promises)
+- Used in all Controllers
+- Used in Redux async thunks
+- Used in API interceptors
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/order/orderController.js
+place_order = async (req, res) => {
+  try {
+    // Code that might throw an error
+    const { price, products, shippingInfo, userId } = req.body;
+
+    if (!price || !products || !shippingInfo || !userId) {
+      return responseReturn(res, 400, { message: 'Missing required fields' });
+    }
+
+    const customer = await customerModel.findById(userId);
+    const order = await customerOrder.create({ /* ... */ });
+
+    return responseReturn(res, 201, {
+      message: 'Order placed successfully',
+      orderId: order._id
+    });
+
+  } catch (error) {
+    // If there's an error, I catch it here
+    console.error('Place Order Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+};
+```
+
+Code explanation:
+- All code that might fail is in the try block
+- If customerModel.findById() fails → code jumps to catch
+- If customerOrder.create() fails → code jumps to catch
+- In catch I log the error and return 500 (Internal Server Error)
+- This prevents the server from crashing!
+
+--------------------------------------------------------------------------------
+Arrow Functions
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Arrow functions are a shorter and easier way to write functions in JavaScript.
+They are written with => instead of function.
+
+Why I used it:
+--------------
+I used arrow functions throughout the entire project because:
+1. The code is shorter and more readable
+2. They preserve the this context (important in React components)
+3. It's the modern JavaScript standard
+
+How it works:
+-------------
+```javascript
+// Regular function:
+function add(a, b) {
+  return a + b;
+}
+
+// Arrow function:
+const add = (a, b) => {
+  return a + b;
+};
+
+// Short arrow function (automatic return):
+const add = (a, b) => a + b;
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+// Arrow function as a method inside a class
+_normalizeWord = (word) => {
+  if (word.endsWith('s') && word.length > 3) {
+    return word.slice(0, -1);
+  }
+  return word;
+};
+
+// Arrow function in array methods
+words.forEach(word => {
+  const normalizedWord = this._normalizeWord(word);
+  searchConditions.push({ /* ... */ });
+});
+
+// Arrow function in filter
+const words = lowerMessage.split(/\s+/).filter(word =>
+  word.length > 2 && !stopWords.includes(word)
+);
+```
+
+Code explanation:
+- _normalizeWord is an arrow function that receives a word and returns the normalized version
+- forEach receives an arrow function that runs on each word
+- filter receives an arrow function that returns true/false
+
+--------------------------------------------------------------------------------
+Destructuring - Object and Array Destructuring
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Destructuring is a way to extract values from objects or arrays and put them
+into variables in one line.
+
+Why I used it:
+--------------
+I used destructuring throughout the entire project because:
+1. The code is shorter and more readable
+2. I can extract only the fields I need
+3. It's the modern JavaScript standard
+
+How it works:
+-------------
+```javascript
+// Without destructuring:
+const name = req.body.name;
+const email = req.body.email;
+const password = req.body.password;
+
+// With destructuring:
+const { name, email, password } = req.body;
+
+// Destructuring with a different name:
+const { data: responseData } = await api.post('/login', info);
+
+// Array destructuring:
+const [first, second] = [1, 2, 3];  // first=1, second=2
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/home/customerAuthController.js
+async customer_register(req, res) {
+  try {
+    // Destructuring req.body
+    const { name, email, password } = req.body;
+
+    // Destructuring bcrypt result
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Destructuring create result
+    const newCustomer = await customerModel.create({
+      name: name.trim(),
+      email: email.trim(),
+      password: hashedPassword
+    });
+
+    return responseReturn(res, 201, {
+      message: 'User registered successfully',
+      token,
+      userInfo
+    });
+  } catch (error) {
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      // Destructuring response - takes only data
+      const { data } = await api.post('/customer/login', info);
+
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+Code explanation:
+- const { name, email, password } = req.body extracts 3 fields from req.body
+- const { data } = await api.post() extracts only data from the response
+- This saves me from writing req.body.name, req.body.email, etc.
+
+--------------------------------------------------------------------------------
+Modules (import/export) - Code Organization
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Modules allow me to split my code into separate files and import/export
+functionality between them. This is ES6 module syntax.
+
+Why I used it:
+--------------
+I use modules throughout my project because:
+1. Code organization - Each file has a specific purpose
+2. Reusability - Import the same function in multiple files
+3. Maintainability - Easy to find and update specific functionality
+4. Encapsulation - Only export what's needed, keep internals private
+
+How it works:
+-------------
+```javascript
+// Export (make available to other files)
+export const myFunction = () => { /* ... */ };
+export default MyComponent;
+
+// Import (use in another file)
+import MyComponent from './MyComponent';
+import { myFunction } from './utils';
+```
+
+Types of exports:
+1. **Named export** - export const name = ...
+2. **Default export** - export default ...
+3. **Multiple exports** - export { name1, name2 }
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/api/api.js
+import axios from 'axios';  // Import from node_modules
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+const api = axios.create({ /* ... */ });
+
+// Default export - can import with any name
+export default api;
+```
+
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../api/api';  // Import default export
+
+// Named export - must import with exact name
+export const customer_login = createAsyncThunk(/* ... */);
+export const customer_register = createAsyncThunk(/* ... */);
+
+// Default export
+export default authSlice.reducer;
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/LoginScreen.js
+import React, { useState } from 'react';  // Named imports from React
+import { useDispatch } from 'react-redux';  // Named import
+import { customer_login } from '../store/reducers/authReducer';  // Named import
+
+export default function LoginScreen() {  // Default export
+  const dispatch = useDispatch();
+
+  const handleLogin = () => {
+    dispatch(customer_login({ email, password }));
+  };
+
+  return (/* ... */);
+}
+```
+
+Code explanation:
+- I import external libraries (axios, react) at the top
+- I import my own modules using relative paths (../../api/api)
+- Named exports must be imported with { } and exact name
+- Default exports can be imported with any name
+
+--------------------------------------------------------------------------------
+Optional Chaining (?.) - Safe Property Access
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Optional chaining (?.) allows me to safely access nested object properties
+without worrying about null or undefined errors. If any part is null/undefined,
+it returns undefined instead of throwing an error.
+
+Why I used it:
+--------------
+I use optional chaining throughout my project because:
+1. Prevents crashes from null/undefined errors
+2. Cleaner code than multiple if checks
+3. Safe API response handling (data might be missing)
+4. Safe navigation through nested objects
+
+How it works:
+-------------
+```javascript
+// Without optional chaining:
+const name = user && user.profile && user.profile.name;
+
+// With optional chaining:
+const name = user?.profile?.name;
+
+// If user is null → returns undefined (no error)
+// If profile is null → returns undefined (no error)
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/api/api.js
+console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+// If config.method is undefined, ?. prevents error
+```
+
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post('/customer/login', info);
+
+      // Safe access to nested properties
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+      }
+
+      return fulfillWithValue(data);
+    } catch (error) {
+      // Safe access to error response
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/ProductDetailScreen.js
+const ProductDetailScreen = ({ route }) => {
+  const product = route?.params?.product;  // Safe access
+
+  return (
+    <View>
+      <Text>{product?.name || 'Product not found'}</Text>
+      <Text>${product?.price || 0}</Text>
+      <Image source={{ uri: product?.images?.[0] }} />
+    </View>
+  );
+};
+```
+
+Code explanation:
+- config.method?.toUpperCase() - if method is undefined, returns undefined (no crash)
+- error?.response?.data - safely access nested error data
+- product?.images?.[0] - safely access first image in array
+- This prevents "Cannot read property 'X' of undefined" errors
+
+--------------------------------------------------------------------------------
+Nullish Coalescing (??) - Default Values
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Nullish coalescing (??) returns the right-hand value if the left-hand value is
+null or undefined. It's different from || which also treats 0, false, and '' as falsy.
+
+Why I used it:
+--------------
+I use ?? instead of || when:
+1. I want to allow 0 as a valid value
+2. I want to allow empty string as valid
+3. I only want to use default for null/undefined
+
+How it works:
+-------------
+```javascript
+// || treats 0, false, '' as falsy:
+const count = 0 || 10;  // Returns 10 (wrong!)
+
+// ?? only treats null/undefined as nullish:
+const count = 0 ?? 10;  // Returns 0 (correct!)
+
+// Examples:
+null ?? 'default'      // 'default'
+undefined ?? 'default' // 'default'
+0 ?? 'default'         // 0
+'' ?? 'default'        // ''
+false ?? 'default'     // false
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/order/orderController.js
+place_order = async (req, res) => {
+  const { shipping_fee, payment_method } = req.body;
+
+  // Use ?? to allow 0 as valid shipping fee
+  const finalShippingFee = shipping_fee ?? 5;  // Default to 5 if null/undefined
+  const finalPaymentMethod = payment_method ?? 'cash_on_delivery';
+
+  const order = await customerOrder.create({
+    shipping_fee: finalShippingFee,
+    payment_method: finalPaymentMethod
+  });
+};
+```
+
+```javascript
+// File: Ecommerce_App/src/api/api.js
+import Constants from 'expo-constants';
+
+// Use ?? for default URL
+const BASE_URL = Constants?.expoConfig?.extra?.apiUrl ?? 'http://localhost:5001/api';
+```
+
+Code explanation:
+- shipping_fee ?? 5 - if shipping_fee is null/undefined, use 5
+- If shipping_fee is 0, it uses 0 (not 5) - this is important!
+- With ||, a 0 shipping fee would incorrectly become 5
+
+--------------------------------------------------------------------------------
+Array Methods (map, filter, forEach, find, reduce)
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Array methods are built-in JavaScript functions that operate on arrays. They
+make it easy to transform, filter, and process array data.
+
+Why I used it:
+--------------
+I use array methods extensively because:
+1. Cleaner code than for loops
+2. Functional programming style
+3. Chainable operations
+4. Immutable (don't modify original array)
+
+How each method works:
+----------------------
+
+**map()** - Transform each element, return new array
+```javascript
+const numbers = [1, 2, 3];
+const doubled = numbers.map(n => n * 2);  // [2, 4, 6]
+```
+
+**filter()** - Keep elements that pass test, return new array
+```javascript
+const numbers = [1, 2, 3, 4];
+const evens = numbers.filter(n => n % 2 === 0);  // [2, 4]
+```
+
+**forEach()** - Execute function for each element, no return
+```javascript
+const numbers = [1, 2, 3];
+numbers.forEach(n => console.log(n));  // Logs: 1, 2, 3
+```
+
+**find()** - Return first element that passes test
+```javascript
+const users = [{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }];
+const user = users.find(u => u.id === 2);  // { id: 2, name: 'Jane' }
+```
+
+**reduce()** - Reduce array to single value
+```javascript
+const numbers = [1, 2, 3, 4];
+const sum = numbers.reduce((total, n) => total + n, 0);  // 10
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+// filter() - Remove stop words
+const stopWords = ['the', 'a', 'an', 'for', 'to', 'in'];
+const words = message.split(' ').filter(word =>
+  word.length > 2 && !stopWords.includes(word)
+);
+
+// forEach() - Build search conditions
+words.forEach(word => {
+  const normalizedWord = this._normalizeWord(word);
+  searchConditions.push({
+    name: { $regex: normalizedWord, $options: 'i' }
+  });
+});
+
+// map() - Extract product names
+const productNames = products.map(p => p.name);
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/CartScreen.js
+
+// reduce() - Calculate total price
+const totalPrice = cartItems.reduce((total, item) => {
+  return total + (item.price * item.quantity);
+}, 0);
+
+// map() - Render cart items
+<FlatList
+  data={cartItems}
+  renderItem={({ item }) => <CartItem product={item} />}
+/>
+```
+
+```javascript
+// File: Ecommerce/backend/controllers/order/orderController.js
+
+// find() - Find specific product
+const product = products.find(p => p._id === productId);
+
+// filter() - Get pending orders
+const pendingOrders = orders.filter(order => order.delivery_status === 'pending');
+```
+
+Code explanation:
+- map() transforms data (products → product names)
+- filter() selects subset (only pending orders)
+- forEach() performs action on each item (build search conditions)
+- find() gets single item (specific product)
+- reduce() calculates aggregate (total price)
+
+--------------------------------------------------------------------------------
+Spread Operator (...) - Spreading Arrays and Objects
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+The spread operator (...) allows me to expand arrays or objects into individual
+elements. It's like "unpacking" the contents.
+
+Why I used it:
+--------------
+I used the spread operator throughout my project because:
+1. To copy arrays/objects without mutating the original
+2. To merge multiple arrays or objects
+3. To pass array elements as function arguments
+4. It's essential for immutable state updates in Redux
+
+How it works:
+-------------
+```javascript
+// Spreading arrays:
+const arr1 = [1, 2, 3];
+const arr2 = [...arr1, 4, 5];  // [1, 2, 3, 4, 5]
+
+// Spreading objects:
+const obj1 = { name: 'John', age: 30 };
+const obj2 = { ...obj1, city: 'New York' };  // { name: 'John', age: 30, city: 'New York' }
+
+// Copying without mutation:
+const original = [1, 2, 3];
+const copy = [...original];  // New array, not a reference
+```
+
+How it connects to other parts:
+--------------------------------
+- Used extensively in Redux reducers (immutable updates)
+- Used in React state updates (useState)
+- Used to merge API responses
+- Used to copy cart items
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/screens/LoginScreen.js
+const inputHandle = (name, value) => {
+  setState({
+    ...state,  // Spread existing state
+    [name]: value  // Update only one field
+  });
+};
+```
+
+```javascript
+// File: Ecommerce_App/src/store/reducers/cardReducer.js
+const cardSlice = createSlice({
+  name: 'card',
+  initialState: {
+    card_products: [],
+    card_product_count: 0,
+  },
+  reducers: {
+    messageClear: (state) => {
+      state.errorMessage = '';
+      state.successMessage = '';
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(add_to_card.fulfilled, (state, { payload }) => {
+        // I spread the existing array and add new item
+        state.card_products = [...state.card_products, payload.product];
+        state.successMessage = payload.message;
+      });
+  }
+});
+```
+
+Code explanation:
+- ...state spreads all existing state properties
+- Then I override only the [name] property with the new value
+- This creates a new object without mutating the original state
+- In Redux, I spread the existing card_products array and add the new product
+
+--------------------------------------------------------------------------------
+Template Literals (Backticks) - String Interpolation
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Template literals use backticks (`) instead of quotes and allow me to embed
+variables and expressions directly in strings using ${}.
+
+Why I used it:
+--------------
+I used template literals throughout my project because:
+1. Easier to read than string concatenation
+2. Can include variables directly in strings
+3. Supports multi-line strings
+4. Can include expressions and function calls
+
+How it works:
+-------------
+```javascript
+// Old way (concatenation):
+const message = 'Hello, ' + name + '! You have ' + count + ' items.';
+
+// New way (template literal):
+const message = `Hello, ${name}! You have ${count} items.`;
+
+// Multi-line strings:
+const html = `
+  <div>
+    <h1>${title}</h1>
+    <p>${description}</p>
+  </div>
+`;
+
+// Expressions:
+const total = `Total: $${price * quantity}`;
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/api/api.js
+console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+```
+
+```javascript
+// File: Ecommerce/backend/controllers/order/orderController.js
+const generateOrderNumber = () => {
+  const date = moment().format('YYYYMMDD');
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `ORD-${date}-${random}`;  // Template literal for order number
+};
+```
+
+```javascript
+// File: Ecommerce_App/src/store/reducers/homeReducer.js
+export const product_details = createAsyncThunk(
+  'home/product_details',
+  async (slug, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      // Template literal in API endpoint
+      const { data } = await api.get(`/home/product-details/${slug}`);
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+```
+
+Code explanation:
+- I use ${config.method?.toUpperCase()} to embed the HTTP method in the log
+- I use ${date} and ${random} to create the order number format
+- I use ${slug} to dynamically create the API endpoint URL
+
+================================================================================
+                    2. REDUX TOOLKIT - STATE MANAGEMENT
+================================================================================
+
+--------------------------------------------------------------------------------
+createAsyncThunk - Async Actions
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+createAsyncThunk is a Redux Toolkit function that simplifies creating async
+actions (like API calls). It automatically generates pending, fulfilled, and
+rejected action types.
+
+Why I used it:
+--------------
+I used createAsyncThunk for all API calls in my mobile app because:
+1. Automatically handles loading states (pending/fulfilled/rejected)
+2. Simplifies error handling
+3. Works seamlessly with Redux reducers
+4. Reduces boilerplate code significantly
+
+How it works:
+-------------
+When I dispatch a createAsyncThunk action:
+1. Pending action is dispatched immediately (loading starts)
+2. The async function runs (API call)
+3. If successful → fulfilled action is dispatched
+4. If error → rejected action is dispatched
+
+Diagram:
+```
+dispatch(customer_login(data))
+         ↓
+    Pending (loading: true)
+         ↓
+    API Call (await api.post(...))
+         ↓
+    ├─→ Fulfilled (success, data received)
+    └─→ Rejected (error, error message received)
+```
+
+How it connects to other parts:
+--------------------------------
+- Works with Axios API calls
+- Updates Redux state automatically
+- Triggers UI loading indicators
+- Used in all Redux reducers (auth, home, card, order)
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',  // Action type prefix
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      // Make API call
+      const { data } = await api.post('/customer/login', info);
+
+      // Save token to AsyncStorage
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+      }
+
+      // Return success with data
+      return fulfillWithValue(data);
+    } catch (error) {
+      // Return error
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+```javascript
+// Using in a component
+// File: Ecommerce_App/src/screens/LoginScreen.js
+const handleLogin = () => {
+  dispatch(customer_login({ email, password }));
+  // This automatically dispatches:
+  // 1. auth/customer_login/pending
+  // 2. auth/customer_login/fulfilled (or rejected)
+};
+```
+
+Code explanation:
+- createAsyncThunk takes 2 arguments: action type and async function
+- The async function receives the payload (info) and thunkAPI
+- fulfillWithValue() returns success data
+- rejectWithValue() returns error data
+- Redux automatically dispatches pending/fulfilled/rejected actions
+
+--------------------------------------------------------------------------------
+createSlice - Creating Redux Slices
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+createSlice is a Redux Toolkit function that generates a slice of the Redux
+store. It automatically creates action creators and reducers based on the
+reducers I define.
+
+A "slice" is a collection of Redux reducer logic and actions for a single
+feature (e.g., auth slice, cart slice, products slice).
+
+Why I used it:
+--------------
+I use createSlice for all my Redux state because:
+1. Reduces boilerplate - No need to write action types and action creators manually
+2. Immutable updates made easy - Uses Immer library internally
+3. Organized code - All related logic in one place
+4. Type-safe - Better TypeScript support (if I add it later)
+
+How it works:
+-------------
+createSlice generates:
+1. **Reducer function** - Handles state updates
+2. **Action creators** - Functions to dispatch actions
+3. **Action types** - String constants for each action
+
+Structure:
+```javascript
+const slice = createSlice({
+  name: 'featureName',        // Prefix for action types
+  initialState: { /* ... */ }, // Initial state
+  reducers: { /* ... */ },     // Synchronous actions
+  extraReducers: { /* ... */ } // Async thunk actions
+});
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/cardReducer.js
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../api/api';
+
+// Async thunks
+export const add_to_card = createAsyncThunk(
+  'card/add_to_card',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.post('/home/product/add-to-card', info);
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const get_card_products = createAsyncThunk(
+  'card/get_card_products',
+  async (userId, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.get(`/home/product/get-card-product/${userId}`);
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+// Create slice
+const cardSlice = createSlice({
+  name: 'card',
+  initialState: {
+    card_products: [],
+    card_product_count: 0,
+    successMessage: '',
+    errorMessage: '',
+    loader: false
+  },
+
+  // Synchronous reducers
+  reducers: {
+    messageClear: (state) => {
+      state.errorMessage = '';
+      state.successMessage = '';
+    }
+  },
+
+  // Async thunk reducers
+  extraReducers: (builder) => {
+    builder
+      // Add to cart - pending
+      .addCase(add_to_card.pending, (state) => {
+        state.loader = true;
+      })
+      // Add to cart - fulfilled
+      .addCase(add_to_card.fulfilled, (state, { payload }) => {
+        state.loader = false;
+        state.successMessage = payload.message;
+        state.card_product_count = state.card_product_count + 1;
+      })
+      // Add to cart - rejected
+      .addCase(add_to_card.rejected, (state, { payload }) => {
+        state.loader = false;
+        state.errorMessage = payload?.error || 'Failed to add to cart';
+      })
+
+      // Get cart products - fulfilled
+      .addCase(get_card_products.fulfilled, (state, { payload }) => {
+        state.card_products = payload.card_products;
+        state.card_product_count = payload.card_products.length;
+      });
+  }
+});
+
+// Export actions
+export const { messageClear } = cardSlice.actions;
+
+// Export reducer
+export default cardSlice.reducer;
+```
+
+```javascript
+// Using in a component
+// File: Ecommerce_App/src/screens/ProductDetailScreen.js
+import { useDispatch, useSelector } from 'react-redux';
+import { add_to_card, messageClear } from '../store/reducers/cardReducer';
+
+const ProductDetailScreen = () => {
+  const dispatch = useDispatch();
+  const { loader, successMessage } = useSelector((state) => state.card);
+
+  const handleAddToCart = () => {
+    dispatch(add_to_card({
+      userId: user.id,
+      productId: product._id,
+      quantity: 1
+    }));
+  };
+
+  useEffect(() => {
+    if (successMessage) {
+      Toast.show({ type: 'success', text1: successMessage });
+      dispatch(messageClear());  // Clear message after showing
+    }
+  }, [successMessage]);
+
+  return (
+    <TouchableOpacity onPress={handleAddToCart} disabled={loader}>
+      {loader ? <ActivityIndicator /> : <Text>Add to Cart</Text>}
+    </TouchableOpacity>
+  );
+};
+```
+
+Code explanation:
+- createSlice automatically generates action creators (messageClear)
+- I can update state directly (state.loader = true) - Immer handles immutability
+- extraReducers handle async thunk actions (add_to_card.pending/fulfilled/rejected)
+- The component dispatches actions and reads state with useSelector
+
+--------------------------------------------------------------------------------
+configureStore - Setting Up Redux Store
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+configureStore is a Redux Toolkit function that creates the Redux store with
+good defaults. It automatically sets up the Redux DevTools, middleware, and
+combines reducers.
+
+Why I used it:
+--------------
+I use configureStore instead of createStore because:
+1. Automatic Redux DevTools setup
+2. Built-in middleware (thunk, serializable check)
+3. Better development experience
+4. Works seamlessly with Redux Persist
+
+How it works:
+-------------
+The store is the single source of truth for all application state. All
+components read from and write to this store.
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/index.js
+import { configureStore } from '@reduxjs/toolkit';
+import { persistStore, persistReducer } from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { combineReducers } from '@reduxjs/toolkit';
+
+// Import all reducers
+import authReducer from './reducers/authReducer';
+import homeReducer from './reducers/homeReducer';
+import cardReducer from './reducers/cardReducer';
+import orderReducer from './reducers/orderReducer';
+
+// Configure persistence
+const persistConfig = {
+  key: 'root',
+  storage: AsyncStorage,
+  whitelist: ['auth', 'card'], // Only persist auth and cart data
+};
+
+// Combine all reducers
+const rootReducer = combineReducers({
+  auth: authReducer,
+  home: homeReducer,
+  card: cardReducer,
+  order: orderReducer,
+});
+
+// Create persisted reducer
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+// Configure store
+export const store = configureStore({
+  reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // Ignore redux-persist actions
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+      },
+    }),
+});
+
+// Create persistor
+export const persistor = persistStore(store);
+```
+
+```javascript
+// Using the store in App.js
+// File: Ecommerce_App/App.js
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './src/store';
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <NavigationContainer>
+          {/* App content */}
+        </NavigationContainer>
+      </PersistGate>
+    </Provider>
+  );
+}
+```
+
+Code explanation:
+- I combine all reducers (auth, home, card, order) into one root reducer
+- I configure persistence to save auth and card data to AsyncStorage
+- configureStore creates the store with the persisted reducer
+- Provider makes the store available to all components
+- PersistGate delays rendering until persisted state is loaded
+
+--------------------------------------------------------------------------------
+extraReducers - Handling Async Thunk Actions
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+extraReducers is a property in createSlice that allows me to handle actions
+defined outside the slice (like createAsyncThunk actions). It's where I handle
+pending, fulfilled, and rejected states for async operations.
+
+Why I used it:
+--------------
+I use extraReducers for all async operations because:
+1. Handles all 3 states of async operations (pending/fulfilled/rejected)
+2. Updates loading indicators automatically
+3. Handles success and error messages
+4. Keeps async logic separate from sync reducers
+
+How it works:
+-------------
+For each createAsyncThunk, I handle 3 action types:
+1. **pending** - Action dispatched when async operation starts
+2. **fulfilled** - Action dispatched when async operation succeeds
+3. **rejected** - Action dispatched when async operation fails
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    loader: false,
+    userInfo: null,
+    token: null,
+    errorMessage: '',
+    successMessage: ''
+  },
+  reducers: {
+    messageClear: (state) => {
+      state.errorMessage = '';
+      state.successMessage = '';
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      // LOGIN - Pending
+      .addCase(customer_login.pending, (state) => {
+        state.loader = true;  // Show loading spinner
+        state.errorMessage = '';
+      })
+
+      // LOGIN - Fulfilled (Success)
+      .addCase(customer_login.fulfilled, (state, { payload }) => {
+        state.loader = false;  // Hide loading spinner
+        state.userInfo = payload.userInfo;  // Save user data
+        state.token = payload.token;  // Save token
+        state.successMessage = payload.message;  // Show success message
+      })
+
+      // LOGIN - Rejected (Error)
+      .addCase(customer_login.rejected, (state, { payload }) => {
+        state.loader = false;  // Hide loading spinner
+        state.errorMessage = payload?.error || 'Login failed';  // Show error
+      })
+
+      // REGISTER - Pending
+      .addCase(customer_register.pending, (state) => {
+        state.loader = true;
+      })
+
+      // REGISTER - Fulfilled
+      .addCase(customer_register.fulfilled, (state, { payload }) => {
+        state.loader = false;
+        state.userInfo = payload.userInfo;
+        state.token = payload.token;
+        state.successMessage = payload.message;
+      })
+
+      // REGISTER - Rejected
+      .addCase(customer_register.rejected, (state, { payload }) => {
+        state.loader = false;
+        state.errorMessage = payload?.error || 'Registration failed';
+      });
+  }
+});
+```
+
+```javascript
+// How this affects the UI
+// File: Ecommerce_App/src/screens/LoginScreen.js
+const LoginScreen = () => {
+  const dispatch = useDispatch();
+  const { loader, errorMessage, successMessage } = useSelector((state) => state.auth);
+
+  const handleLogin = () => {
+    dispatch(customer_login({ email, password }));
+    // Immediately: loader becomes true (pending)
+    // After API call: loader becomes false, userInfo is set (fulfilled)
+    // Or: loader becomes false, errorMessage is set (rejected)
+  };
+
+  return (
+    <View>
+      {loader && <ActivityIndicator />}  {/* Shows during pending */}
+      {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
+      {successMessage && <Text style={styles.success}>{successMessage}</Text>}
+
+      <TouchableOpacity onPress={handleLogin} disabled={loader}>
+        <Text>Login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+```
+
+Code explanation:
+- extraReducers handles 3 states for each async action
+- pending: Set loader to true, clear errors
+- fulfilled: Set loader to false, save data, show success
+- rejected: Set loader to false, show error
+- The UI automatically updates based on these state changes
+
+--------------------------------------------------------------------------------
+fulfillWithValue / rejectWithValue - Returning from Thunks
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+fulfillWithValue and rejectWithValue are functions provided by createAsyncThunk
+that allow me to return custom payloads from async thunks.
+
+Why I used it:
+--------------
+I use these functions because:
+1. Control exactly what data is passed to reducers
+2. Include custom error messages
+3. Transform API responses before storing in state
+4. Better error handling
+
+How it works:
+-------------
+- **fulfillWithValue(data)** - Returns data to fulfilled reducer
+- **rejectWithValue(error)** - Returns error to rejected reducer
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/orderReducer.js
+export const place_order = createAsyncThunk(
+  'order/place_order',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.post('/order/place-order', info);
+
+      // Return success with custom payload
+      return fulfillWithValue({
+        message: data.message,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber
+      });
+    } catch (error) {
+      // Return error with custom payload
+      return rejectWithValue({
+        error: error?.response?.data?.error || 'Failed to place order',
+        status: error?.response?.status
+      });
+    }
+  }
+);
+```
+
+```javascript
+// Handling in extraReducers
+const orderSlice = createSlice({
+  name: 'order',
+  initialState: {
+    orders: [],
+    currentOrder: null,
+    successMessage: '',
+    errorMessage: ''
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(place_order.fulfilled, (state, { payload }) => {
+        // payload is what I returned from fulfillWithValue
+        state.successMessage = payload.message;
+        state.currentOrder = {
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber
+        };
+      })
+      .addCase(place_order.rejected, (state, { payload }) => {
+        // payload is what I returned from rejectWithValue
+        state.errorMessage = payload.error;
+      });
+  }
+});
+```
+
+Code explanation:
+- fulfillWithValue() lets me customize the success payload
+- rejectWithValue() lets me customize the error payload
+- The reducer receives exactly what I returned
+- This gives me full control over what data is stored in state
+
+--------------------------------------------------------------------------------
+Redux Persist - Persisting State to AsyncStorage
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Redux Persist is a library that automatically saves Redux state to AsyncStorage
+and reloads it when the app restarts. This keeps users logged in and preserves
+cart data between app sessions.
+
+Why I used it:
+--------------
+I use Redux Persist because:
+1. Keep users logged in (persist auth token)
+2. Save cart items (persist cart data)
+3. Better user experience (no need to re-login every time)
+4. Automatic synchronization with AsyncStorage
+
+How it works:
+-------------
+Flow:
+```
+App Starts
+    ↓
+Redux Persist reads AsyncStorage
+    ↓
+Rehydrates Redux state
+    ↓
+App renders with persisted data
+    ↓
+User makes changes (login, add to cart)
+    ↓
+Redux state updates
+    ↓
+Redux Persist automatically saves to AsyncStorage
+    ↓
+App closes
+    ↓
+Next time app opens, data is still there!
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/index.js
+import { persistStore, persistReducer } from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Configure what to persist
+const persistConfig = {
+  key: 'root',
+  storage: AsyncStorage,
+  whitelist: ['auth', 'card'],  // Only persist these reducers
+  // blacklist: ['home', 'order']  // Don't persist these (optional)
+};
+
+const rootReducer = combineReducers({
+  auth: authReducer,    // PERSISTED - user stays logged in
+  card: cardReducer,    // PERSISTED - cart items saved
+  home: homeReducer,    // NOT PERSISTED - fresh products on each launch
+  order: orderReducer,  // NOT PERSISTED - fresh orders on each launch
+});
+
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+export const store = configureStore({
+  reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+      },
+    }),
+});
+
+export const persistor = persistStore(store);
+```
+
+```javascript
+// Using in App.js
+// File: Ecommerce_App/App.js
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './src/store';
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <PersistGate loading={<ActivityIndicator />} persistor={persistor}>
+        {/* App content - renders after state is rehydrated */}
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      </PersistGate>
+    </Provider>
+  );
+}
+```
+
+Code explanation:
+- I persist only 'auth' and 'card' reducers (whitelist)
+- 'home' and 'order' are NOT persisted (fresh data on each launch)
+- PersistGate delays rendering until persisted state is loaded
+- When user logs in, token is automatically saved to AsyncStorage
+- When app restarts, user is still logged in!
+
+--------------------------------------------------------------------------------
+combineReducers - Combining Multiple Reducers
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+combineReducers is a Redux function that combines multiple reducer functions
+into a single root reducer. Each reducer manages its own slice of the state.
+
+Why I used it:
+--------------
+I use combineReducers because:
+1. Organize state by feature (auth, cart, products, orders)
+2. Each reducer is independent and focused
+3. Easier to maintain and test
+4. Scalable architecture
+
+How it works:
+-------------
+State structure:
+```javascript
+{
+  auth: {
+    userInfo: { /* ... */ },
+    token: '...',
+    loader: false
+  },
+  card: {
+    card_products: [ /* ... */ ],
+    card_product_count: 5
+  },
+  home: {
+    products: [ /* ... */ ],
+    categorys: [ /* ... */ ]
+  },
+  order: {
+    orders: [ /* ... */ ]
+  }
+}
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/index.js
+import { combineReducers } from '@reduxjs/toolkit';
+import authReducer from './reducers/authReducer';
+import homeReducer from './reducers/homeReducer';
+import cardReducer from './reducers/cardReducer';
+import orderReducer from './reducers/orderReducer';
+
+const rootReducer = combineReducers({
+  auth: authReducer,    // Manages: userInfo, token, loader
+  home: homeReducer,    // Manages: products, categorys, priceRange
+  card: cardReducer,    // Manages: card_products, card_product_count
+  order: orderReducer,  // Manages: orders, currentOrder
+});
+```
+
+```javascript
+// Accessing state in components
+// File: Ecommerce_App/src/screens/HomeScreen.js
+const { products, categorys } = useSelector((state) => state.home);
+const { userInfo } = useSelector((state) => state.auth);
+const { card_product_count } = useSelector((state) => state.card);
+
+// state.home comes from homeReducer
+// state.auth comes from authReducer
+// state.card comes from cardReducer
+```
+
+Code explanation:
+- Each reducer manages its own slice of state
+- combineReducers creates a root reducer with all slices
+- Components access state using state.sliceName.property
+- This keeps state organized and maintainable
+
+================================================================================
+                    3. REACT & REACT NATIVE - USER INTERFACE
+================================================================================
+
+--------------------------------------------------------------------------------
+useState - Local Component State
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+useState is a React Hook that allows me to add state to functional components.
+It returns an array with the current state value and a function to update it.
+
+Syntax: const [state, setState] = useState(initialValue);
+
+Why I used it:
+--------------
+I use useState for local component state because:
+1. Form inputs (email, password, search query)
+2. UI toggles (show/hide password, modal open/close)
+3. Temporary data (current page, selected tab)
+4. Data that only one component needs
+
+How it works:
+-------------
+When I call setState:
+1. React schedules a re-render
+2. Component function runs again
+3. useState returns the new value
+4. UI updates to reflect new state
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/screens/LoginScreen.js
+export default function LoginScreen({ navigation }) {
+  // Local state for form inputs
+  const [state, setState] = useState({
+    email: '',
+    password: ''
+  });
+
+  // Local state for password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Update state when user types
+  const inputHandle = (name, value) => {
+    setState({
+      ...state,  // Keep existing state
+      [name]: value  // Update only this field
+    });
+  };
+
+  return (
+    <View>
+      <TextInput
+        placeholder="Email"
+        value={state.email}
+        onChangeText={(text) => inputHandle('email', text)}
+      />
+
+      <TextInput
+        placeholder="Password"
+        value={state.password}
+        secureTextEntry={!showPassword}
+        onChangeText={(text) => inputHandle('password', text)}
+      />
+
+      <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+        <Text>{showPassword ? 'Hide' : 'Show'} Password</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/ShopScreen.js
+export default function ShopScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setCurrentPage(1);  // Reset to page 1 when searching
+  };
+
+  return (
+    <View>
+      <TextInput
+        placeholder="Search products..."
+        value={searchQuery}
+        onChangeText={handleSearch}
+      />
+    </View>
+  );
+}
+```
+
+Code explanation:
+- useState creates local state that only this component uses
+- When state changes, component re-renders automatically
+- I use object state for related fields (email, password)
+- I use separate state for independent values (showPassword)
+
+--------------------------------------------------------------------------------
+useEffect - Side Effects and Lifecycle
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+useEffect is a React Hook that allows me to perform side effects in functional
+components. Side effects include: API calls, subscriptions, timers, manual DOM
+manipulation.
+
+Syntax: useEffect(() => { /* effect */ }, [dependencies]);
+
+Why I used it:
+--------------
+I use useEffect for:
+1. Fetching data when component mounts
+2. Subscribing to events (socket connections)
+3. Cleaning up resources when component unmounts
+4. Running code when specific values change
+
+How it works:
+-------------
+useEffect runs at different times based on dependencies:
+- **No dependencies** - Runs after every render
+- **Empty array []** - Runs once after first render (componentDidMount)
+- **[dep1, dep2]** - Runs when dep1 or dep2 changes
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/screens/HomeScreen.js
+export default function HomeScreen() {
+  const dispatch = useDispatch();
+  const { products, categorys } = useSelector((state) => state.home);
+
+  // Run once when component mounts
+  useEffect(() => {
+    dispatch(get_products());
+    dispatch(get_categorys());
+  }, [dispatch]);  // Only re-run if dispatch changes (it doesn't)
+
+  return (
+    <ScrollView>
+      <FlatList data={products} renderItem={/* ... */} />
+    </ScrollView>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/ProductDetailScreen.js
+export default function ProductDetailScreen({ route }) {
+  const { slug } = route.params;
+  const dispatch = useDispatch();
+
+  // Run when slug changes (different product)
+  useEffect(() => {
+    dispatch(product_details(slug));
+  }, [slug, dispatch]);  // Re-run when slug changes
+
+  return (/* ... */);
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/LoginScreen.js
+export default function LoginScreen() {
+  const { successMessage, errorMessage } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+
+  // Show toast when messages change
+  useEffect(() => {
+    if (successMessage) {
+      Toast.show({ type: 'success', text1: successMessage });
+      dispatch(messageClear());  // Clear message after showing
+    }
+  }, [successMessage]);  // Run when successMessage changes
+
+  useEffect(() => {
+    if (errorMessage) {
+      Toast.show({ type: 'error', text1: errorMessage });
+      dispatch(messageClear());
+    }
+  }, [errorMessage]);  // Run when errorMessage changes
+
+  return (/* ... */);
+}
+```
+
+```javascript
+// Cleanup example
+useEffect(() => {
+  // Subscribe to something
+  const subscription = someAPI.subscribe();
+
+  // Cleanup function (runs when component unmounts)
+  return () => {
+    subscription.unsubscribe();
+  };
+}, []);
+```
+
+Code explanation:
+- useEffect with [] runs once when component mounts (fetch initial data)
+- useEffect with [slug] runs when slug changes (fetch different product)
+- useEffect with [successMessage] runs when message changes (show toast)
+- Return function in useEffect runs when component unmounts (cleanup)
+
+--------------------------------------------------------------------------------
+useDispatch - Dispatching Redux Actions
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+useDispatch is a React-Redux Hook that returns the dispatch function from the
+Redux store. I use it to dispatch actions to update Redux state.
+
+Syntax: const dispatch = useDispatch();
+
+Why I used it:
+--------------
+I use useDispatch to:
+1. Trigger API calls (dispatch async thunks)
+2. Update global state (dispatch actions)
+3. Clear messages (dispatch messageClear)
+4. Connect components to Redux
+
+How it works:
+-------------
+Flow:
+```
+Component
+    ↓
+dispatch(action)
+    ↓
+Redux Store
+    ↓
+Reducer updates state
+    ↓
+Components using that state re-render
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/screens/LoginScreen.js
+import { useDispatch, useSelector } from 'react-redux';
+import { customer_login } from '../store/reducers/authReducer';
+
+export default function LoginScreen({ navigation }) {
+  const dispatch = useDispatch();  // Get dispatch function
+  const { loader } = useSelector((state) => state.auth);
+
+  const [state, setState] = useState({ email: '', password: '' });
+
+  const handleLogin = () => {
+    // Dispatch async thunk action
+    dispatch(customer_login({
+      email: state.email,
+      password: state.password
+    }));
+  };
+
+  return (
+    <TouchableOpacity onPress={handleLogin} disabled={loader}>
+      <Text>Login</Text>
+    </TouchableOpacity>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/ProductDetailScreen.js
+import { useDispatch } from 'react-redux';
+import { add_to_card } from '../store/reducers/cardReducer';
+
+export default function ProductDetailScreen({ route }) {
+  const dispatch = useDispatch();
+  const { userInfo } = useSelector((state) => state.auth);
+  const product = route.params.product;
+
+  const handleAddToCart = () => {
+    if (!userInfo) {
+      Alert.alert('Please login first');
+      return;
+    }
+
+    // Dispatch add to cart action
+    dispatch(add_to_card({
+      userId: userInfo.id,
+      productId: product._id,
+      quantity: 1
+    }));
+  };
+
+  return (
+    <TouchableOpacity onPress={handleAddToCart}>
+      <Text>Add to Cart</Text>
+    </TouchableOpacity>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/HomeScreen.js
+export default function HomeScreen() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    // Dispatch multiple actions
+    dispatch(get_products());
+    dispatch(get_categorys());
+  }, [dispatch]);
+
+  return (/* ... */);
+}
+```
+
+Code explanation:
+- useDispatch() returns the dispatch function
+- I call dispatch(action) to trigger Redux actions
+- Async thunks are dispatched the same way as regular actions
+- Multiple components can dispatch the same action
+
+--------------------------------------------------------------------------------
+useSelector - Reading Redux State
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+useSelector is a React-Redux Hook that allows me to extract data from the Redux
+store state. When the selected state changes, the component automatically
+re-renders.
+
+Syntax: const value = useSelector((state) => state.sliceName.property);
+
+Why I used it:
+--------------
+I use useSelector to:
+1. Read global state in components
+2. Access user information (userInfo, token)
+3. Display cart count (card_product_count)
+4. Show loading indicators (loader)
+5. Display products, orders, etc.
+
+How it works:
+-------------
+Flow:
+```
+Redux state changes
+    ↓
+useSelector detects change
+    ↓
+Component re-renders
+    ↓
+UI updates with new data
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/components/Header.js
+import { useSelector } from 'react-redux';
+
+export default function Header({ navigation }) {
+  // Select multiple pieces of state
+  const { userInfo } = useSelector((state) => state.auth);
+  const { card_product_count } = useSelector((state) => state.card);
+
+  return (
+    <View style={styles.header}>
+      {/* Cart icon with badge */}
+      <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
+        <Ionicons name="cart-outline" size={24} />
+        {card_product_count > 0 && (
+          <View style={styles.badge}>
+            <Text>{card_product_count}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* User menu */}
+      {userInfo ? (
+        <Text>Welcome, {userInfo.name}</Text>
+      ) : (
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text>Login</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/HomeScreen.js
+export default function HomeScreen() {
+  const { products, categorys, loader } = useSelector((state) => state.home);
+
+  if (loader) {
+    return <ActivityIndicator />;
+  }
+
+  return (
+    <ScrollView>
+      <FlatList
+        data={products}
+        renderItem={({ item }) => <ProductCard product={item} />}
+      />
+    </ScrollView>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/CartScreen.js
+export default function CartScreen() {
+  const { card_products } = useSelector((state) => state.card);
+  const { userInfo } = useSelector((state) => state.auth);
+
+  // Calculate total
+  const total = card_products.reduce((sum, item) => {
+    return sum + (item.price * item.quantity);
+  }, 0);
+
+  return (
+    <View>
+      <FlatList data={card_products} renderItem={/* ... */} />
+      <Text>Total: ${total}</Text>
+    </View>
+  );
+}
+```
+
+Code explanation:
+- useSelector extracts data from Redux state
+- Component re-renders automatically when selected state changes
+- I can select from different slices (state.auth, state.card, state.home)
+- I can select multiple values in one component
+
+--------------------------------------------------------------------------------
+useNavigation - React Navigation Hook
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+useNavigation is a React Navigation Hook that provides access to the navigation
+object. I use it to navigate between screens in my React Native app.
+
+Why I used it:
+--------------
+I use useNavigation to:
+1. Navigate to different screens (Login, Cart, ProductDetail)
+2. Pass parameters between screens
+3. Go back to previous screen
+4. Navigate from nested components (not just screen components)
+
+How it works:
+-------------
+Navigation methods:
+- **navigate(screenName, params)** - Go to a screen
+- **goBack()** - Go to previous screen
+- **push(screenName, params)** - Push new screen on stack
+- **replace(screenName, params)** - Replace current screen
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/components/ProductCard.js
+import { useNavigation } from '@react-navigation/native';
+
+export default function ProductCard({ product }) {
+  const navigation = useNavigation();  // Get navigation object
+
+  const handlePress = () => {
+    // Navigate to ProductDetail screen with product data
+    navigation.navigate('ProductDetail', {
+      product: product,
+      slug: product.slug
+    });
+  };
+
+  return (
+    <TouchableOpacity onPress={handlePress}>
+      <Image source={{ uri: product.images[0] }} />
+      <Text>{product.name}</Text>
+      <Text>${product.price}</Text>
+    </TouchableOpacity>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/ProductDetailScreen.js
+export default function ProductDetailScreen({ route, navigation }) {
+  // Access parameters passed from previous screen
+  const { product, slug } = route.params;
+
+  const handleAddToCart = () => {
+    // Add to cart logic...
+
+    // Navigate to Cart screen
+    navigation.navigate('Cart');
+  };
+
+  const handleGoBack = () => {
+    navigation.goBack();  // Go back to previous screen
+  };
+
+  return (
+    <View>
+      <TouchableOpacity onPress={handleGoBack}>
+        <Ionicons name="arrow-back" size={24} />
+      </TouchableOpacity>
+
+      <Text>{product.name}</Text>
+      <Text>${product.price}</Text>
+
+      <TouchableOpacity onPress={handleAddToCart}>
+        <Text>Add to Cart</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/components/Header.js
+export default function Header() {
+  const navigation = useNavigation();
+  const { userInfo } = useSelector((state) => state.auth);
+
+  return (
+    <View>
+      <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
+        <Ionicons name="cart-outline" size={24} />
+      </TouchableOpacity>
+
+      {!userInfo && (
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text>Login</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+```
+
+Code explanation:
+- useNavigation() works in any component (not just screens)
+- navigation.navigate() goes to a screen and passes parameters
+- route.params contains data passed from previous screen
+- navigation.goBack() returns to previous screen
+
+--------------------------------------------------------------------------------
+FlatList - Rendering Lists Efficiently
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+FlatList is a React Native component for rendering lists efficiently. It only
+renders items that are currently visible on screen (virtualization), making it
+perfect for long lists.
+
+Why I used it:
+--------------
+I use FlatList instead of ScrollView + map() because:
+1. Better performance for long lists (only renders visible items)
+2. Built-in pull-to-refresh
+3. Built-in load more (infinite scroll)
+4. Optimized for mobile devices
+
+How it works:
+-------------
+FlatList renders items on-demand:
+```
+User scrolls down
+    ↓
+FlatList detects scroll position
+    ↓
+Renders items entering viewport
+    ↓
+Removes items leaving viewport
+    ↓
+Memory efficient!
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/screens/ShopScreen.js
+export default function ShopScreen() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const renderProduct = ({ item }) => (
+    <ProductCard product={item} />
+  );
+
+  const handleLoadMore = () => {
+    if (!loading) {
+      setPage(page + 1);
+      // Fetch more products...
+    }
+  };
+
+  const handleRefresh = () => {
+    setPage(1);
+    // Fetch fresh products...
+  };
+
+  return (
+    <FlatList
+      data={products}  // Array of items to render
+      renderItem={renderProduct}  // Function to render each item
+      keyExtractor={(item) => item._id}  // Unique key for each item
+
+      // Performance optimizations
+      initialNumToRender={10}  // Render 10 items initially
+      maxToRenderPerBatch={10}  // Render 10 items per batch
+      windowSize={5}  // Keep 5 screens worth of items in memory
+
+      // Pull to refresh
+      refreshing={loading}
+      onRefresh={handleRefresh}
+
+      // Infinite scroll
+      onEndReached={handleLoadMore}
+      onEndReachedThreshold={0.5}  // Trigger when 50% from bottom
+
+      // Empty state
+      ListEmptyComponent={<Text>No products found</Text>}
+
+      // Loading indicator
+      ListFooterComponent={loading && <ActivityIndicator />}
+    />
+  );
+}
+```
+
+```javascript
+// File: Ecommerce_App/src/screens/CartScreen.js
+export default function CartScreen() {
+  const { card_products } = useSelector((state) => state.card);
+  const dispatch = useDispatch();
+
+  const renderCartItem = ({ item }) => (
+    <View style={styles.cartItem}>
+      <Image source={{ uri: item.images[0] }} style={styles.image} />
+      <View style={styles.details}>
+        <Text>{item.name}</Text>
+        <Text>${item.price}</Text>
+        <Text>Quantity: {item.quantity}</Text>
+      </View>
+      <TouchableOpacity onPress={() => dispatch(delete_card_product(item._id))}>
+        <Ionicons name="trash-outline" size={24} color="red" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <FlatList
+      data={card_products}
+      renderItem={renderCartItem}
+      keyExtractor={(item) => item._id}
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Text>Your cart is empty</Text>
+        </View>
+      }
+    />
+  );
+}
+```
+
+Code explanation:
+- data prop receives array of items
+- renderItem receives each item and returns JSX
+- keyExtractor provides unique key for each item
+- onEndReached triggers when user scrolls near bottom (infinite scroll)
+- refreshing and onRefresh enable pull-to-refresh
+- ListEmptyComponent shows when data array is empty
+
+--------------------------------------------------------------------------------
+AsyncStorage - Persistent Storage
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+AsyncStorage is React Native's key-value storage system. It's like localStorage
+in web browsers but asynchronous and optimized for mobile.
+
+Why I used it:
+--------------
+I use AsyncStorage to:
+1. Store authentication token (keep user logged in)
+2. Store user information
+3. Cache data for offline access
+4. Save user preferences
+
+How it works:
+-------------
+AsyncStorage is asynchronous (all operations return Promises):
+- **setItem(key, value)** - Save data
+- **getItem(key)** - Retrieve data
+- **removeItem(key)** - Delete data
+- **multiRemove([keys])** - Delete multiple items
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce_App/src/store/reducers/authReducer.js
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.post('/customer/login', info);
+
+      // Save token to AsyncStorage
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+      }
+
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+```javascript
+// File: Ecommerce_App/src/api/api.js
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Request interceptor - Add token from AsyncStorage
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      // Retrieve token from AsyncStorage
+      const customerToken = await AsyncStorage.getItem('customerToken');
+
+      if (customerToken) {
+        config.headers.Authorization = `Bearer ${customerToken}`;
+      }
+    } catch (error) {
+      console.error('Error reading token:', error);
+    }
+    return config;
+  }
+);
+
+// Response interceptor - Clear token on 401
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Clear stored authentication data
+      await AsyncStorage.multiRemove(['customerToken', 'customerInfo']);
+      console.log('🔄 Cleared expired authentication data');
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+```javascript
+// File: Ecommerce_App/src/context/AuthContext.js
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+
+  useEffect(() => {
+    checkAuthState();
+  }, []);
+
+  const checkAuthState = async () => {
+    try {
+      // Load saved auth data on app start
+      const storedToken = await AsyncStorage.getItem('customerToken');
+      const storedUser = await AsyncStorage.getItem('customerInfo');
+
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));  // Parse JSON string
+      }
+    } catch (error) {
+      console.error('Error checking auth state:', error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Clear AsyncStorage on logout
+      await AsyncStorage.multiRemove(['customerToken', 'customerInfo']);
+      setUser(null);
+      setToken(null);
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+Code explanation:
+- AsyncStorage.setItem() saves data (must be string)
+- AsyncStorage.getItem() retrieves data (returns string or null)
+- JSON.stringify() converts objects to strings for storage
+- JSON.parse() converts strings back to objects
+- AsyncStorage.multiRemove() deletes multiple items at once
+- All operations are async (use await)
+
+================================================================================
+                    4. BACKEND - EXPRESS.JS & NODE.JS
+================================================================================
+
+--------------------------------------------------------------------------------
+Middleware - Request/Response Pipeline
+--------------------------------------------------------------------------------
+
+What it is:
+-----------
+Middleware are functions that execute during the request-response cycle in
+Express.js. They have access to the request (req), response (res), and next
+middleware function (next).
+
+Middleware can:
+1. Execute code
+2. Modify req and res objects
+3. End the request-response cycle
+4. Call the next middleware
+
+Why I used it:
+--------------
+I use middleware for:
+1. Authentication (check if user is logged in)
+2. Logging (log all requests)
+3. Error handling (catch and handle errors)
+4. Parsing request body (JSON parsing)
+5. CORS (allow cross-origin requests)
+
+How it works:
+-------------
+Middleware chain:
+```
+HTTP Request
+    ↓
+Middleware 1 (CORS)
+    ↓ next()
+Middleware 2 (JSON Parser)
+    ↓ next()
+Middleware 3 (Auth Check)
+    ↓ next()
+Route Handler (Controller)
+    ↓
+HTTP Response
+```
+
+Example from my project:
+------------------------
+```javascript
+// File: Ecommerce/backend/middlewares/authMiddleware.js
+import jwt from 'jsonwebtoken';
+
+export const authMiddleware = async (req, res, next) => {
+  try {
+    // 1. Extract token from header or cookie
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies.customerToken;
+
+    // 2. Check if token exists
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    // 3. Verify token
+    const decoded = jwt.verify(token, process.env.SECRET);
+
+    // 4. Add user info to request object
+    req.userId = decoded.id;
+    req.userRole = decoded.role;
+
+    // 5. Call next middleware/controller
+    next();
+
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+```
+
+```javascript
+// File: Ecommerce/backend/middlewares/optionalAuthMiddleware.js
+export const optionalAuthMiddleware = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies.customerToken;
+
+    if (token) {
+      // Token exists - verify and add user info
+      const decoded = jwt.verify(token, process.env.SECRET);
+      req.userId = decoded.id;
+      req.userRole = decoded.role;
+    }
+    // No token - continue anyway (optional auth)
+    next();
+
+  } catch (error) {
+    // Invalid token - continue anyway
+    next();
+  }
+};
+```
+
+```javascript
+// Using middleware in routes
+// File: Ecommerce/backend/routes/home/customerAuthRoutes.js
+import { authMiddleware } from '../../middlewares/authMiddleware.js';
+
+// Public route - no middleware
+router.post('/customer/login', customerAuthController.customer_login);
+
+// Protected route - requires authentication
+router.get('/customer/profile', authMiddleware, customerAuthController.get_profile);
+
+// Optional auth route
+router.post('/chatbot/message', optionalAuthMiddleware, chatbotController.handleMessage);
+```
+
+Code explanation:
+- Middleware receives (req, res, next)
+- It can modify req (add userId, userRole)
+- It calls next() to continue to next middleware/controller
+- If it doesn't call next(), request stops there
+- Middleware can send response and end the cycle
+
