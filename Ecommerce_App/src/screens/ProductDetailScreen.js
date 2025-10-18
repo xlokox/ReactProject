@@ -42,15 +42,15 @@ export default function ProductDetailScreen({ route, navigation }) {
       <Card style={styles.detailsCard}>
         <Card.Content>
           <Title style={styles.productName}>{product.name}</Title>
-          <Title style={styles.productPrice}>₪{product.price}</Title>
-          <Paragraph style={styles.shippingText}>משלוח: ₪10</Paragraph>
+          <Title style={styles.productPrice}>${product.price}</Title>
+          <Paragraph style={styles.shippingText}>Shipping: $5</Paragraph>
 
           {product.category && (
             <Chip style={styles.categoryChip}>{product.category}</Chip>
           )}
 
           <Paragraph style={styles.description}>
-            {product.description || 'אין תיאור זמין למוצר זה.'}
+            {product.description || 'No description available for this product.'}
           </Paragraph>
           
           <Button
@@ -59,7 +59,7 @@ export default function ProductDetailScreen({ route, navigation }) {
             style={styles.addButton}
             buttonColor="#059473"
           >
-            הוסף לעגלה
+            Add to Cart
           </Button>
         </Card.Content>
       </Card>

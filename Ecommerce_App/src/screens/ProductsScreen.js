@@ -33,7 +33,7 @@ export default function ProductsScreen({ navigation, route }) {
   const { addToCart } = useCart();
 
   useEffect(() => {
-    // Reset and load first page when filters change
+    // Reset and load first page when filters change OR on mount (for random shuffle)
     setProducts([]);
     setPageNumber(1);
     loadProducts({ reset: true, nextPage: 1 });
@@ -41,14 +41,24 @@ export default function ProductsScreen({ navigation, route }) {
   }, [searchQuery, selectedCategory]);
 
   const buildQueryString = (page) => {
-    const qs = new URLSearchParams({
+    const isRandom = (!selectedCategory && !searchQuery);
+    const params = {
       category: selectedCategory || '',
       searchValue: searchQuery || '',
       lowPrice: '0',
       highPrice: '100000',
       pageNumber: String(page),
-      parPage: String(parPage)
-    }).toString();
+      parPage: String(parPage),
+      // Add random=true when no category/search is selected (Shop All view)
+      random: isRandom ? 'true' : 'false'
+    };
+
+    // Add timestamp to prevent caching when random=true
+    if (isRandom) {
+      params._t = Date.now().toString();
+    }
+
+    const qs = new URLSearchParams(params).toString();
     return qs;
   };
 
@@ -102,8 +112,8 @@ export default function ProductsScreen({ navigation, route }) {
           <Paragraph numberOfLines={2} style={styles.productName}>
             {item.name}
           </Paragraph>
-          <Title style={styles.productPrice}>₪{item.price}</Title>
-          <Paragraph style={styles.shippingText}>משלוח: ₪10</Paragraph>
+          <Title style={styles.productPrice}>${item.price}</Title>
+          <Paragraph style={styles.shippingText}>Shipping: $5</Paragraph>
           <Button
             mode="contained"
             compact
@@ -111,7 +121,7 @@ export default function ProductsScreen({ navigation, route }) {
             style={styles.addButton}
             buttonColor="#059473"
           >
-            הוסף לעגלה
+            Add to Cart
           </Button>
         </Card.Content>
       </Card>
@@ -135,7 +145,7 @@ export default function ProductsScreen({ navigation, route }) {
     <View style={styles.container}>
       {/* Search Bar */}
       <Searchbar
-        placeholder="חפש מוצרים..."
+        placeholder="Search products..."
         onChangeText={setSearchQuery}
         value={searchQuery}
         style={styles.searchBar}
@@ -148,7 +158,7 @@ export default function ProductsScreen({ navigation, route }) {
           onPress={() => setSelectedCategory('')}
           style={styles.categoryChip}
         >
-          הכל
+          All
         </Chip>
         {categories.map(renderCategory)}
       </View>

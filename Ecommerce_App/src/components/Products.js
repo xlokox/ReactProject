@@ -26,8 +26,8 @@ export default function Products({ title, products, navigation }) {
 
     if (!user) {
       console.log('❌ User not logged in');
-      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים לעגלה', [
-        { text: 'ביטול', style: 'cancel' },
+      Alert.alert('Login נדרשת', 'אנא התחבר כדי להוסיף Products לעגלה', [
+        { text: 'Cancel', style: 'cancel' },
         { text: 'התחבר', onPress: () => navigation.navigate('Login') }
       ]);
       return;
@@ -42,18 +42,18 @@ export default function Products({ title, products, navigation }) {
 
       if (result && result.success) {
         console.log('✅ Product added successfully!');
-        Alert.alert('הצלחה!', 'המוצר נוסף לעגלה בהצלחה', [
-          { text: 'המשך קניות', style: 'cancel' },
-          { text: 'עבור לעגלה', onPress: () => navigation.navigate('Cart') }
+        Alert.alert('Success!', 'Product added to cart successfully', [
+          { text: 'Continue Shopping', style: 'cancel' },
+          { text: 'Go to Cart', onPress: () => navigation.navigate('Cart') }
         ]);
       } else {
         console.log('❌ Failed to add product:', result?.message);
-        Alert.alert('שגיאה', result?.message || 'לא ניתן להוסיף את המוצר לעגלה');
+        Alert.alert('Error', result?.message || 'Unable to add product to cart');
       }
     } catch (error) {
       console.error('❌ Error adding to cart:', error);
       console.error('Error details:', error.message);
-      Alert.alert('שגיאה', 'אירעה שגיאה בהוספת המוצר לעגלה: ' + error.message);
+      Alert.alert('Error', 'אירעה Error בהוספת המוצר לעגלה: ' + error.message);
     } finally {
       setLoadingProductId(null);
     }
@@ -61,14 +61,14 @@ export default function Products({ title, products, navigation }) {
 
   const addToWishlist = (product) => {
     if (!user) {
-      Alert.alert('התחברות נדרשת', 'אנא התחבר כדי להוסיף מוצרים למועדפים', [
-        { text: 'ביטול', style: 'cancel' },
+      Alert.alert('Login נדרשת', 'אנא התחבר כדי להוסיף Products למועדפים', [
+        { text: 'Cancel', style: 'cancel' },
         { text: 'התחבר', onPress: () => navigation.navigate('Login') }
       ]);
       return;
     }
 
-    Alert.alert('הצלחה!', 'המוצר נוסף למועדפים');
+    Alert.alert('Success!', 'המוצר נוסף למועדפים');
   };
 
   const renderProduct = ({ item }) => (
@@ -96,15 +96,15 @@ export default function Products({ title, products, navigation }) {
         </Text>
         
         <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>₪{item.price}</Text>
+          <Text style={styles.currentPrice}>${item.price}</Text>
           {item.discount > 0 && (
             <Text style={styles.originalPrice}>
-              ₪{Math.floor(item.price + (item.price * item.discount) / 100)}
+              ${Math.floor(item.price + (item.price * item.discount) / 100)}
             </Text>
           )}
         </View>
 
-        <Text style={styles.shippingText}>משלוח: ₪10</Text>
+        <Text style={styles.shippingText}>Shipping: $5</Text>
 
         <View style={styles.ratingContainer}>
           {[...Array(5)].map((_, index) => (

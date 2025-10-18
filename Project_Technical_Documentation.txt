@@ -1,0 +1,2775 @@
+================================================================================
+                    E-COMMERCE PROJECT TECHNICAL DOCUMENTATION
+                          MERN Stack + React Native Mobile App
+================================================================================
+
+Author: Daniel Knafel
+Date: October 18, 2025
+Project: EasyShop - Full-Stack E-Commerce Platform
+
+================================================================================
+                              TABLE OF CONTENTS
+================================================================================
+
+1. PROJECT OVERVIEW & ARCHITECTURE
+2. DETAILED PROCESS FLOW EXPLANATIONS (NEW - ENHANCED)
+3. AI CHATBOT IMPLEMENTATION (DETAILED)
+4. BACKEND CONTROLLERS - COMPLETE BREAKDOWN (NEW - ENHANCED)
+5. API INTEGRATION - HOW I BUILT IT (NEW - ENHANCED)
+6. REDUX STATE MANAGEMENT (MOBILE APP)
+7. DATABASE SYNCHRONIZATION & DATA FLOW
+8. KEY TECHNICAL DECISIONS & SOLUTIONS
+9. IMPORTANT CODE SECTIONS & ALGORITHMS
+10. PRESENTATION KEY POINTS
+
+================================================================================
+                        1. PROJECT OVERVIEW & ARCHITECTURE
+================================================================================
+
+TECHNOLOGY STACK:
+-----------------
+Backend:
+  - Node.js + Express.js (RESTful API)
+  - MongoDB + Mongoose (Database & ODM)
+  - JWT (Authentication & Authorization)
+  - Socket.io (Real-time chat)
+  - OpenAI API (GPT-4o-mini for AI chatbot)
+  - Cloudinary (Image storage)
+
+Frontend (Website):
+  - React.js
+  - Redux Toolkit (State management)
+  - Axios (HTTP client)
+  - React Router (Navigation)
+
+Mobile App:
+  - React Native + Expo
+  - Redux Toolkit (State management)
+  - AsyncStorage (Persistent storage)
+  - React Navigation (Navigation)
+
+Admin Dashboard:
+  - React.js
+  - Full CRUD operations for products, categories, orders
+  - Real-time order management
+
+PROJECT STRUCTURE:
+------------------
+ReactProject/
+├── Ecommerce/
+│   ├── backend/          # Express.js API server
+│   │   ├── controllers/  # Business logic
+│   │   ├── models/       # MongoDB schemas
+│   │   ├── routes/       # API endpoints
+│   │   ├── middlewares/  # Auth, validation, logging
+│   │   └── services/     # OpenAI, Cloudinary, etc.
+│   ├── frontend/         # React website
+│   └── dashboard/        # Admin dashboard
+└── Ecommerce_App/        # React Native mobile app
+    ├── src/
+    │   ├── screens/      # App screens
+    │   ├── components/   # Reusable components
+    │   ├── store/        # Redux store & reducers
+    │   ├── api/          # API client
+    │   └── context/      # React Context (Auth, Cart)
+
+WHY I CHOSE THIS ARCHITECTURE:
+-------------------------------
+1. MERN Stack: I chose MongoDB for its flexibility with product schemas and easy 
+   integration with Node.js. Express provides a clean, modular API structure.
+
+2. Separation of Concerns: I separated the backend, frontend, dashboard, and 
+   mobile app into distinct directories to maintain clear boundaries and enable 
+   independent deployment.
+
+3. Single API Server: I designed one unified backend (port 5001) that serves all 
+   three clients (website, mobile app, admin dashboard) through the same API 
+   endpoints. This ensures data consistency and reduces code duplication.
+
+4. Redux Toolkit: I implemented Redux Toolkit for state management because it 
+   provides built-in async handling (createAsyncThunk), immutability, and 
+   excellent DevTools support.
+
+5. React Native + Expo: I chose Expo for the mobile app because it allows rapid
+   development, easy testing via QR code, and provides a great developer
+   experience without needing native code.
+
+================================================================================
+                  2. DETAILED PROCESS FLOW EXPLANATIONS
+================================================================================
+
+In this section, I'll walk through exactly what happens at each stage of the
+most important processes in my system. These are step-by-step explanations
+with real-world scenarios.
+
+--------------------------------------------------------------------------------
+                    2.1 USER AUTHENTICATION FLOW (LOGIN)
+--------------------------------------------------------------------------------
+
+SCENARIO: A user opens the mobile app and clicks "Login", enters their email
+and password, then clicks "Submit".
+
+STEP-BY-STEP PROCESS:
+
+Step 1: User Interaction (Mobile App - LoginScreen.js)
+-------------------------------------------------------
+Location: Ecommerce_App/src/screens/LoginScreen.js
+
+What happens:
+- User enters email: "john@example.com"
+- User enters password: "password123"
+- User clicks "Login" button
+- The onPress handler is triggered
+
+Code that runs:
+```javascript
+const handleLogin = () => {
+  // I validate the input first
+  if (!email || !password) {
+    Alert.alert('Error', 'Please fill in all fields');
+    return;
+  }
+
+  // I dispatch the Redux action
+  dispatch(customer_login({ email, password }));
+};
+```
+
+Step 2: Redux Action Dispatch (authReducer.js)
+-----------------------------------------------
+Location: Ecommerce_App/src/store/reducers/authReducer.js
+
+What happens:
+- The customer_login async thunk is called
+- Redux sets loader: true (shows loading spinner)
+- The action makes an API call
+
+Code that runs:
+```javascript
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      // I'm making a POST request to the login endpoint
+      const { data } = await api.post('/customer/login', info);
+
+      // If successful, I persist the token and user info
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+      }
+      if (data?.userInfo) {
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+      }
+
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+Step 3: API Client Interceptor (api.js)
+----------------------------------------
+Location: Ecommerce_App/src/api/api.js
+
+What happens:
+- The request interceptor runs BEFORE the request is sent
+- It adds headers and logs the request
+
+Code that runs:
+```javascript
+api.interceptors.request.use(
+  async (config) => {
+    // I check if there's a token in AsyncStorage
+    const customerToken = await AsyncStorage.getItem('customerToken');
+    if (customerToken) {
+      // I add it to the Authorization header
+      config.headers.Authorization = `Bearer ${customerToken}`;
+    }
+
+    // I add mobile client identifiers
+    config.headers['X-Client-Type'] = 'mobile';
+    config.headers['X-Platform'] = 'react-native';
+
+    console.log(`🚀 API Request: POST /customer/login`);
+    return config;
+  }
+);
+```
+
+Step 4: HTTP Request to Backend
+--------------------------------
+What happens:
+- Axios sends a POST request to: http://localhost:5001/api/customer/login
+- Request body: { email: "john@example.com", password: "password123" }
+- Request headers include Content-Type, X-Client-Type, X-Platform
+
+Step 5: Express Route Handler (authRoutes.js)
+----------------------------------------------
+Location: Ecommerce/backend/routes/authRoutes.js
+
+What happens:
+- Express receives the request
+- Routes it to the customer_login method
+
+Code that runs:
+```javascript
+router.post('/customer/login', authController.customer_login);
+```
+
+Step 6: Controller Method (CustomerAuthController.js)
+------------------------------------------------------
+Location: Ecommerce/backend/controllers/home/customerAuthController.js
+
+What happens:
+- The controller validates the input
+- Searches for the user in MongoDB
+- Compares the password hash
+- Generates a JWT token
+- Returns the token and user info
+
+Code that runs (line by line):
+```javascript
+async customer_login(req, res) {
+  try {
+    // I extract email and password from request body
+    const { email, password } = req.body;
+
+    // I validate that both fields are provided
+    if (!email || !password) {
+      return responseReturn(res, 400, { error: 'All fields are required' });
+    }
+
+    // I search for the customer in MongoDB by email
+    const customer = await customerModel.findOne({ email: email.trim() });
+
+    // If customer doesn't exist, return error
+    if (!customer) {
+      return responseReturn(res, 404, { error: 'Invalid email or password' });
+    }
+
+    // I compare the provided password with the hashed password in database
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+
+    // If password doesn't match, return error
+    if (!isPasswordValid) {
+      return responseReturn(res, 401, { error: 'Invalid email or password' });
+    }
+
+    // I create a JWT token with user information
+    const token = createToken({
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      method: customer.method,
+      role: 'customer'
+    });
+
+    // I set the token as an HTTP-only cookie (for web)
+    res.cookie('customerToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    });
+
+    // I prepare user info to send back (without password!)
+    const userInfo = {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      method: customer.method,
+      role: 'customer'
+    };
+
+    // I return success response with token and user info
+    return responseReturn(res, 200, {
+      message: 'Login successful',
+      token,
+      userInfo
+    });
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+}
+```
+
+Step 7: MongoDB Query
+---------------------
+What happens:
+- Mongoose executes: customerModel.findOne({ email: "john@example.com" })
+- MongoDB searches the 'customers' collection
+- Returns the customer document if found
+
+Database query:
+```javascript
+db.customers.findOne({ email: "john@example.com" })
+```
+
+Result:
+```javascript
+{
+  _id: ObjectId("507f1f77bcf86cd799439011"),
+  name: "John Doe",
+  email: "john@example.com",
+  password: "$2b$10$hashedpasswordhere...",
+  method: "manual",
+  createdAt: ISODate("2025-10-01T10:00:00Z")
+}
+```
+
+Step 8: JWT Token Creation (tokenCreate.js)
+--------------------------------------------
+Location: Ecommerce/backend/utiles/tokenCreate.js
+
+What happens:
+- I create a JWT token with the user's information
+- The token is signed with a secret key
+- It expires in 7 days
+
+Code that runs:
+```javascript
+export const createToken = (payload) => {
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: '7d'
+  });
+};
+```
+
+Generated token (example):
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjUwN2YxZjc3YmNmODZjZDc5OTQzOTAxMSIsIm5hbWUiOiJKb2huIERvZSIsImVtYWlsIjoiam9obkBleGFtcGxlLmNvbSIsIm1ldGhvZCI6Im1hbnVhbCIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTY5NzYzNTIwMCwiZXhwIjoxNjk4MjQwMDAwfQ.signature
+```
+
+Step 9: Response Sent Back to Mobile App
+-----------------------------------------
+What happens:
+- Express sends HTTP 200 response
+- Response body contains token and userInfo
+
+Response:
+```javascript
+{
+  message: "Login successful",
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  userInfo: {
+    id: "507f1f77bcf86cd799439011",
+    name: "John Doe",
+    email: "john@example.com",
+    method: "manual",
+    role: "customer"
+  }
+}
+```
+
+Step 10: API Response Interceptor (api.js)
+-------------------------------------------
+Location: Ecommerce_App/src/api/api.js
+
+What happens:
+- The response interceptor runs AFTER receiving the response
+- It logs the response
+
+Code that runs:
+```javascript
+api.interceptors.response.use(
+  (response) => {
+    console.log(`✅ API Response: POST /customer/login - 200`);
+    console.log('Response data:', response.data);
+    return response;
+  }
+);
+```
+
+Step 11: Redux Reducer Updates State (authReducer.js)
+------------------------------------------------------
+What happens:
+- The fulfilled case is triggered
+- Redux updates the state with token and userInfo
+- Sets loader: false (hides loading spinner)
+
+Code that runs:
+```javascript
+.addCase(customer_login.fulfilled, (state, { payload }) => {
+  state.loader = false;
+  state.successMessage = payload.message;
+  state.token = payload.token;
+  state.userInfo = payload.userInfo;
+  state.errorMessage = '';
+})
+```
+
+State after update:
+```javascript
+{
+  loader: false,
+  userInfo: {
+    id: "507f1f77bcf86cd799439011",
+    name: "John Doe",
+    email: "john@example.com",
+    method: "manual",
+    role: "customer"
+  },
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  successMessage: "Login successful",
+  errorMessage: ''
+}
+```
+
+Step 12: UI Update (LoginScreen.js)
+------------------------------------
+What happens:
+- The component re-renders because Redux state changed
+- I check if login was successful
+- I navigate to the Home screen
+
+Code that runs:
+```javascript
+useEffect(() => {
+  if (successMessage) {
+    Alert.alert('Success', successMessage);
+    dispatch(messageClear());
+    navigation.navigate('Home');
+  }
+}, [successMessage]);
+```
+
+Step 13: AsyncStorage Persistence
+----------------------------------
+What happens:
+- The token and userInfo are already saved to AsyncStorage (from Step 2)
+- This means the user stays logged in even if they close the app
+
+Stored data:
+```javascript
+AsyncStorage.getItem('customerToken')
+// Returns: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+AsyncStorage.getItem('customerInfo')
+// Returns: '{"id":"507f1f77bcf86cd799439011","name":"John Doe",...}'
+```
+
+COMPLETE FLOW DIAGRAM:
+```
+User enters credentials
+         ↓
+LoginScreen.js (handleLogin)
+         ↓
+Redux Action (customer_login)
+         ↓
+API Client (api.js) - Request Interceptor
+         ↓
+HTTP POST → http://localhost:5001/api/customer/login
+         ↓
+Express Route Handler
+         ↓
+CustomerAuthController.customer_login()
+         ↓
+MongoDB Query (findOne by email)
+         ↓
+bcrypt.compare(password, hashedPassword)
+         ↓
+createToken(userInfo) → JWT
+         ↓
+Response: { token, userInfo, message }
+         ↓
+API Client - Response Interceptor
+         ↓
+Redux Reducer (fulfilled case)
+         ↓
+AsyncStorage.setItem('customerToken', token)
+         ↓
+UI Update → Navigate to Home
+         ↓
+User is now logged in! ✅
+```
+
+SECURITY MEASURES I IMPLEMENTED:
+- ✅ Password is hashed with bcrypt (never stored in plain text)
+- ✅ JWT token expires after 7 days
+- ✅ Token is stored in HTTP-only cookie (for web) to prevent XSS
+- ✅ Token is also returned in response body (for mobile app)
+- ✅ Password is never returned in API responses
+- ✅ Input validation on both frontend and backend
+- ✅ Error messages don't reveal if email exists (security best practice)
+
+--------------------------------------------------------------------------------
+                    2.2 PRODUCT SEARCH FLOW (WITH FILTERS)
+--------------------------------------------------------------------------------
+
+SCENARIO: A user wants to find "laptops under $1000" in the Electronics category.
+
+STEP-BY-STEP PROCESS:
+
+Step 1: User Interaction (ProductsScreen.js)
+---------------------------------------------
+What happens:
+- User selects category: "Electronics"
+- User types in search box: "laptop"
+- User sets price range: $0 - $1000
+- User clicks "Search"
+
+Step 2: Build Query String
+---------------------------
+Code that runs:
+```javascript
+const buildQueryString = (page) => {
+  const params = new URLSearchParams({
+    category: selectedCategory || '',
+    searchValue: searchText || '',
+    lowPrice: priceRange[0] || 0,
+    highPrice: priceRange[1] || 100000,
+    pageNumber: page,
+    parPage: 12
+  });
+  return params.toString();
+};
+```
+
+Generated query string:
+```
+category=Electronics&searchValue=laptop&lowPrice=0&highPrice=1000&pageNumber=1&parPage=12
+```
+
+Step 3: API Request
+-------------------
+Code that runs:
+```javascript
+const response = await api.get(`/home/query-products?${queryString}`);
+```
+
+Full URL:
+```
+GET http://localhost:5001/api/home/query-products?category=Electronics&searchValue=laptop&lowPrice=0&highPrice=1000&pageNumber=1&parPage=12
+```
+
+Step 4: Controller Method (HomeController.js)
+----------------------------------------------
+Location: Ecommerce/backend/controllers/home/homeControllers.js
+
+What happens:
+- I extract all query parameters
+- I build a MongoDB query with filters
+- I execute the query with pagination
+- I return the results
+
+Code that runs:
+```javascript
+query_products = async (req, res) => {
+  try {
+    // I extract query parameters
+    const { category, searchValue, lowPrice, highPrice, pageNumber, parPage } = req.query;
+
+    // I build the search query
+    let query = {};
+
+    // Category filter
+    if (category) {
+      query.category = category;
+    }
+
+    // Search filter (name, description, brand)
+    if (searchValue) {
+      query.$or = [
+        { name: { $regex: searchValue, $options: 'i' } },
+        { description: { $regex: searchValue, $options: 'i' } },
+        { brand: { $regex: searchValue, $options: 'i' } }
+      ];
+    }
+
+    // Price range filter
+    if (lowPrice && highPrice) {
+      query.price = {
+        $gte: parseInt(lowPrice),
+        $lte: parseInt(highPrice)
+      };
+    }
+
+    // I calculate pagination
+    const skipPage = parPage * (pageNumber - 1);
+
+    // I execute the query
+    const products = await productModel
+      .find(query)
+      .skip(skipPage)
+      .limit(parPage)
+      .sort({ createdAt: -1 });
+
+    // I count total products for pagination
+    const totalProduct = await productModel.countDocuments(query);
+
+    // I return the results
+    return responseReturn(res, 200, {
+      products,
+      totalProduct,
+      parPage: parseInt(parPage)
+    });
+
+  } catch (error) {
+    console.error('Error in query_products:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+};
+```
+
+Step 5: MongoDB Query Execution
+--------------------------------
+MongoDB query that gets executed:
+```javascript
+db.products.find({
+  category: "Electronics",
+  $or: [
+    { name: { $regex: "laptop", $options: "i" } },
+    { description: { $regex: "laptop", $options: "i" } },
+    { brand: { $regex: "laptop", $options: "i" } }
+  ],
+  price: { $gte: 0, $lte: 1000 }
+})
+.skip(0)
+.limit(12)
+.sort({ createdAt: -1 })
+```
+
+Results (example):
+```javascript
+[
+  {
+    _id: ObjectId("..."),
+    name: "Dell XPS 15 Laptop",
+    category: "Electronics",
+    price: 899,
+    discount: 10,
+    brand: "Dell",
+    stock: 15,
+    images: ["https://res.cloudinary.com/..."],
+    description: "High-performance laptop for professionals",
+    rating: 4.5
+  },
+  {
+    _id: ObjectId("..."),
+    name: "HP Pavilion Laptop",
+    category: "Electronics",
+    price: 749,
+    discount: 5,
+    brand: "HP",
+    stock: 20,
+    images: ["https://res.cloudinary.com/..."],
+    description: "Affordable laptop for students",
+    rating: 4.2
+  }
+]
+```
+
+Step 6: Response Sent Back
+---------------------------
+Response:
+```javascript
+{
+  products: [ /* array of 2 products */ ],
+  totalProduct: 2,
+  parPage: 12
+}
+```
+
+Step 7: Redux State Update
+---------------------------
+Code that runs:
+```javascript
+.addCase(query_products.fulfilled, (state, { payload }) => {
+  state.products = payload.products;
+  state.totalProduct = payload.totalProduct;
+  state.parPage = payload.parPage;
+  state.loader = false;
+})
+```
+
+Step 8: UI Renders Products
+----------------------------
+What happens:
+- FlatList re-renders with new products
+- Each product card displays image, name, price, rating
+- User sees 2 laptops under $1000 in Electronics category
+
+COMPLETE FLOW DIAGRAM:
+```
+User sets filters (category, search, price)
+         ↓
+Build query string
+         ↓
+API GET /home/query-products?...
+         ↓
+HomeController.query_products()
+         ↓
+Build MongoDB query with filters
+         ↓
+Execute query with pagination
+         ↓
+Count total documents
+         ↓
+Return { products, totalProduct, parPage }
+         ↓
+Redux updates state
+         ↓
+FlatList renders products
+         ↓
+User sees filtered results! ✅
+```
+
+================================================================================
+                    3. AI CHATBOT IMPLEMENTATION (DETAILED)
+================================================================================
+
+OVERVIEW:
+---------
+I implemented an intelligent AI chatbot that integrates with OpenAI's GPT-4o-mini
+model to provide product recommendations, order tracking, and customer support.
+The chatbot is accessible to both guest users and authenticated customers.
+
+FILE: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+KEY FEATURES I IMPLEMENTED:
+----------------------------
+✅ Natural language product search with keyword extraction
+✅ Singular/plural word normalization (e.g., "laptops" → "laptop")
+✅ Language detection and consistency (English/Hebrew)
+✅ Secure order tracking (only shows user's own orders)
+✅ Optional authentication (works for guests and logged-in users)
+✅ Budget-based product filtering
+✅ Intelligent product recommendations using AI
+
+CHALLENGE 1: AUTHENTICATION ISSUE
+----------------------------------
+Problem: Initially, I added required authentication middleware to all chatbot 
+routes to fix a security issue with order tracking. This broke the chatbot for 
+guest users because they couldn't access it without logging in.
+
+My Solution:
+I created a custom "optional authentication" middleware that:
+  1. Checks if a JWT token exists in cookies or Authorization header
+  2. If token exists and is valid → extracts user info (req.id, req.role)
+  3. If no token or invalid token → allows request to continue as guest
+  4. Sets req.isAuthenticated flag to indicate auth status
+
+File: Ecommerce/backend/middlewares/optionalAuthMiddleware.js
+
+Code I wrote:
+```javascript
+export const optionalAuthMiddleware = (req, res, next) => {
+  try {
+    const cookieToken = req.cookies?.accessToken;
+    let headerToken = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader) {
+      headerToken = authHeader.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : authHeader;
+    }
+
+    const token = cookieToken || headerToken;
+
+    if (!token) {
+      // No token - continue as guest
+      req.id = null;
+      req.role = null;
+      req.isAuthenticated = false;
+      return next();
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.id = decoded.id;
+      req.role = decoded.role;
+      req.isAuthenticated = true;
+      next();
+    } catch (error) {
+      // Invalid token - continue as guest
+      req.id = null;
+      req.role = null;
+      req.isAuthenticated = false;
+      next();
+    }
+  } catch (error) {
+    req.id = null;
+    req.role = null;
+    req.isAuthenticated = false;
+    next();
+  }
+};
+```
+
+Why this is clever: This middleware pattern allows me to have a single chatbot 
+endpoint that works for both guest users (product browsing) and authenticated 
+users (order tracking), without duplicating code or creating separate endpoints.
+
+CHALLENGE 2: PRODUCT SEARCH NOT FINDING RESULTS
+------------------------------------------------
+Problem: Users were searching for "laptops" but the database had products named 
+"Dell XPS 15 Laptop" (singular). The search was failing because "laptops" ≠ "laptop".
+
+My Solution - Word Normalization:
+I implemented a smart normalization function that handles singular/plural variations:
+
+```javascript
+_normalizeWord = (word) => {
+  // Remove common plural endings to match singular forms
+  if (word.endsWith('s') && word.length > 3) {
+    return word.slice(0, -1); // "laptops" → "laptop"
+  }
+  return word;
+};
+```
+
+Then I integrated this into the product search:
+```javascript
+_searchProducts = async (message, budget = null) => {
+  // Extract keywords (remove stop words like "show", "me", "find")
+  const stopWords = ['show', 'me', 'find', 'looking', 'for', 'need', 
+                     'want', 'buy', 'get', 'a', 'an', 'the'];
+  const words = lowerMessage.split(/\s+/).filter(word => 
+    word.length > 2 && !stopWords.includes(word)
+  );
+
+  // Build search query with normalized keywords
+  words.forEach(word => {
+    const normalizedWord = this._normalizeWord(word);
+    searchConditions.push({
+      $or: [
+        { name: { $regex: normalizedWord, $options: 'i' } },
+        { description: { $regex: normalizedWord, $options: 'i' } },
+        { category: { $regex: normalizedWord, $options: 'i' } },
+        { brand: { $regex: normalizedWord, $options: 'i' } }
+      ]
+    });
+  });
+};
+```
+
+Result: Now when users search for "laptops for students", the chatbot:
+  1. Extracts keywords: ["laptops", "students"]
+  2. Normalizes them: ["laptop", "student"]
+  3. Searches MongoDB with regex for each normalized keyword
+  4. Finds products like "Dell XPS 15 Laptop" ✅
+
+CHALLENGE 3: LANGUAGE CONSISTENCY
+----------------------------------
+Problem: The chatbot was responding in Hebrew when users wrote in English, 
+creating a confusing experience.
+
+My Solution - Language Detection:
+I implemented a regex-based language detector:
+
+```javascript
+_detectLanguage = (message) => {
+  const hebrewPattern = /[\u0590-\u05FF]/;
+  const englishPattern = /[a-zA-Z]/;
+  
+  const hasHebrew = hebrewPattern.test(message);
+  const hasEnglish = englishPattern.test(message);
+  
+  if (hasHebrew && !hasEnglish) return 'hebrew';
+  if (hasEnglish && !hasHebrew) return 'english';
+  if (hasHebrew && hasEnglish) return 'mixed';
+  return 'english'; // Default
+};
+```
+
+Then I enforce language consistency in the OpenAI prompt:
+```javascript
+const languageInstruction = detectedLanguage === 'hebrew'
+  ? 'CRITICAL: Respond ONLY in Hebrew. Do not use any English words.'
+  : 'CRITICAL: Respond ONLY in English. Do not use any Hebrew words.';
+```
+
+This ensures the AI always responds in the same language the user is using.
+
+CHALLENGE 4: SECURE ORDER TRACKING
+-----------------------------------
+Problem: The chatbot was showing orders that didn't belong to the user - a major
+security vulnerability!
+
+My Solution - Authentication-Based Filtering:
+I implemented a two-layer security approach:
+
+1. Check if user is authenticated before showing orders:
+```javascript
+if (isOrderQuery) {
+  if (!isAuthenticated || !customerId) {
+    // User not logged in - ask them to login
+    aiResponse = await openaiService.getResponse(
+      `The user asked about orders but is not logged in.
+       Politely tell them to login first.`,
+      conversationHistory
+    );
+  } else {
+    // User is authenticated - proceed with order tracking
+    const orders = await this._getUserOrders(customerId, 5);
+    // Only returns orders where customerId matches!
+  }
+}
+```
+
+2. Filter database queries by customerId:
+```javascript
+_getUserOrders = async (customerId, limit = 5) => {
+  const orders = await customerOrder.find({
+    customerId: customerId  // Critical: Only user's orders!
+  })
+  .select('orderNumber price delivery_status date')
+  .sort({ createdAt: -1 })
+  .limit(limit);
+
+  return orders;
+};
+```
+
+This ensures users can ONLY see their own orders, never someone else's.
+
+OPENAI INTEGRATION:
+-------------------
+I integrated OpenAI's GPT-4o-mini model for intelligent responses:
+
+File: Ecommerce/backend/services/openaiService.js
+
+Key features I implemented:
+  - Conversation history tracking (last 10 messages for context)
+  - System prompts with strict instructions (language, tone, product info)
+  - Error handling and fallback responses
+  - Token usage logging for monitoring costs
+
+Example system prompt I crafted:
+```javascript
+const systemPrompt = `You are EasyShop's helpful AI assistant.
+RULES:
+1. ${languageInstruction}
+2. Be friendly, professional, and concise
+3. Use emojis to make responses engaging
+4. When recommending products, highlight: name, price, discount, rating
+5. Never make up product information - only use provided data
+6. For order tracking, provide clear status updates
+7. If you don't know something, admit it and offer alternatives`;
+```
+
+================================================================================
+          4. BACKEND CONTROLLERS - COMPLETE BREAKDOWN (ENHANCED)
+================================================================================
+
+I organized the backend into modular controllers, each handling a specific domain.
+In this section, I'll provide COMPLETE details for each controller including:
+- All methods with full signatures
+- Input parameters and output values
+- Step-by-step logic explanation
+- Error handling
+- Security measures
+
+--------------------------------------------------------------------------------
+                    4.1 CUSTOMER AUTH CONTROLLER (DETAILED)
+--------------------------------------------------------------------------------
+
+FILE: Ecommerce/backend/controllers/home/customerAuthController.js
+PURPOSE: Handle customer authentication (register, login, logout)
+
+METHOD 1: customer_register()
+------------------------------
+ENDPOINT: POST /api/customer/register
+AUTHENTICATION: None required (public endpoint)
+
+INPUT PARAMETERS (req.body):
+```javascript
+{
+  name: String (required),      // Customer's full name
+  email: String (required),     // Customer's email (must be unique)
+  password: String (required)   // Plain text password (will be hashed)
+}
+```
+
+OUTPUT (Success - 201):
+```javascript
+{
+  message: "User registered successfully",
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  userInfo: {
+    id: "507f1f77bcf86cd799439011",
+    name: "John Doe",
+    email: "john@example.com",
+    method: "manual",
+    role: "customer"
+  }
+}
+```
+
+OUTPUT (Error - 400):
+```javascript
+{
+  error: "All fields are required"  // or "Email already exists"
+}
+```
+
+STEP-BY-STEP LOGIC:
+```javascript
+async customer_register(req, res) {
+  try {
+    // Step 1: Extract data from request body
+    const { name, email, password } = req.body;
+
+    // Step 2: Validate all fields are provided
+    if (!name || !email || !password) {
+      return responseReturn(res, 400, { error: 'All fields are required' });
+    }
+
+    // Step 3: Check if email already exists in database
+    const existingCustomer = await customerModel.findOne({
+      email: email.trim()
+    });
+
+    if (existingCustomer) {
+      return responseReturn(res, 400, { error: 'Email already exists' });
+    }
+
+    // Step 4: Hash the password using bcrypt (10 salt rounds)
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Step 5: Create new customer in database
+    const newCustomer = await customerModel.create({
+      name: name.trim(),
+      email: email.trim(),
+      password: hashedPassword,
+      method: 'manual'  // Indicates manual registration (vs OAuth)
+    });
+
+    // Step 6: Create chat record for customer support
+    await sellerCustomerModel.create({ myId: newCustomer.id });
+
+    // Step 7: Generate JWT token
+    const token = createToken({
+      id: newCustomer.id,
+      name: newCustomer.name,
+      email: newCustomer.email,
+      method: newCustomer.method,
+      role: 'customer'
+    });
+
+    // Step 8: Set HTTP-only cookie (for web clients)
+    res.cookie('customerToken', token, {
+      httpOnly: true,  // Prevents JavaScript access (XSS protection)
+      secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)  // 7 days
+    });
+
+    // Step 9: Prepare user info (without password!)
+    const userInfo = {
+      id: newCustomer.id,
+      name: newCustomer.name,
+      email: newCustomer.email,
+      method: newCustomer.method,
+      role: 'customer'
+    };
+
+    // Step 10: Return success response
+    return responseReturn(res, 201, {
+      message: 'User registered successfully',
+      token,
+      userInfo
+    });
+
+  } catch (error) {
+    console.error('Registration Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+}
+```
+
+SECURITY MEASURES:
+- ✅ Password is hashed with bcrypt (never stored in plain text)
+- ✅ Email uniqueness is enforced
+- ✅ Input is trimmed to prevent whitespace issues
+- ✅ Token is set as HTTP-only cookie to prevent XSS attacks
+- ✅ Password is never returned in response
+- ✅ Detailed error messages are logged but not exposed to client
+
+WHY I MADE THESE DECISIONS:
+- I use bcrypt with 10 salt rounds (industry standard for security vs performance)
+- I return both token in cookie AND response body (cookie for web, body for mobile)
+- I create a chat record immediately so customer support can contact the user
+- I use 'manual' method to distinguish from potential OAuth logins later
+
+METHOD 2: customer_login()
+---------------------------
+ENDPOINT: POST /api/customer/login
+AUTHENTICATION: None required (public endpoint)
+
+INPUT PARAMETERS (req.body):
+```javascript
+{
+  email: String (required),     // Customer's email
+  password: String (required)   // Plain text password
+}
+```
+
+OUTPUT (Success - 200):
+```javascript
+{
+  message: "Login successful",
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  userInfo: {
+    id: "507f1f77bcf86cd799439011",
+    name: "John Doe",
+    email: "john@example.com",
+    method: "manual",
+    role: "customer"
+  }
+}
+```
+
+OUTPUT (Error - 401):
+```javascript
+{
+  error: "Invalid email or password"
+}
+```
+
+STEP-BY-STEP LOGIC:
+```javascript
+async customer_login(req, res) {
+  try {
+    // Step 1: Extract credentials
+    const { email, password } = req.body;
+
+    // Step 2: Validate input
+    if (!email || !password) {
+      return responseReturn(res, 400, { error: 'All fields are required' });
+    }
+
+    // Step 3: Find customer by email
+    const customer = await customerModel.findOne({ email: email.trim() });
+
+    // Step 4: Check if customer exists
+    if (!customer) {
+      // SECURITY: Don't reveal if email exists or not
+      return responseReturn(res, 404, { error: 'Invalid email or password' });
+    }
+
+    // Step 5: Compare password with hashed password
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+
+    // Step 6: Check if password is correct
+    if (!isPasswordValid) {
+      return responseReturn(res, 401, { error: 'Invalid email or password' });
+    }
+
+    // Step 7: Generate JWT token
+    const token = createToken({
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      method: customer.method,
+      role: 'customer'
+    });
+
+    // Step 8: Set cookie
+    res.cookie('customerToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    });
+
+    // Step 9: Prepare user info
+    const userInfo = {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      method: customer.method,
+      role: 'customer'
+    };
+
+    // Step 10: Return success
+    return responseReturn(res, 200, {
+      message: 'Login successful',
+      token,
+      userInfo
+    });
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+}
+```
+
+SECURITY MEASURES:
+- ✅ Password comparison uses bcrypt.compare (timing-safe)
+- ✅ Error messages don't reveal if email exists (prevents user enumeration)
+- ✅ Token expires after 7 days
+- ✅ HTTP-only cookie prevents XSS attacks
+
+--------------------------------------------------------------------------------
+                    4.2 ORDER CONTROLLER (DETAILED)
+--------------------------------------------------------------------------------
+
+FILE: Ecommerce/backend/controllers/order/orderController.js
+PURPOSE: Handle order creation, retrieval, and management
+
+METHOD 1: place_order()
+------------------------
+ENDPOINT: POST /api/home/order/place-order
+AUTHENTICATION: Required (authMiddleware)
+
+INPUT PARAMETERS (req.body):
+```javascript
+{
+  userId: String (required),              // Customer ID
+  price: Number (required),               // Subtotal (before shipping)
+  shipping_fee: Number (default: 5),      // Shipping cost
+  products: Array (required),             // Array of product groups
+  shippingInfo: Object (required),        // Shipping address
+  customerInfo: Object (optional),        // Customer details
+  payment_method: String (default: 'cash_on_delivery'),
+  payment_details: Object (optional)      // Payment info
+}
+```
+
+DETAILED INPUT STRUCTURE:
+```javascript
+{
+  userId: "507f1f77bcf86cd799439011",
+  price: 1500,
+  shipping_fee: 5,
+  products: [
+    {
+      sellerId: "507f1f77bcf86cd799439012",
+      price: 1500,
+      products: [
+        {
+          productInfo: {
+            _id: "507f1f77bcf86cd799439013",
+            name: "Dell XPS 15 Laptop",
+            price: 899,
+            images: ["https://res.cloudinary.com/..."],
+            slug: "dell-xps-15-laptop"
+          },
+          quantity: 1,
+          _id: "507f1f77bcf86cd799439014"  // Cart item ID
+        }
+      ]
+    }
+  ],
+  shippingInfo: {
+    street: "123 Main St",
+    city: "New York",
+    zipCode: "10001",
+    country: "United States"
+  },
+  customerInfo: {
+    name: "John Doe",
+    email: "john@example.com",
+    phone: "+1234567890"
+  },
+  payment_method: "credit_card",
+  payment_details: {
+    cardHolder: "John Doe",
+    cardLastFour: "4242"
+  }
+}
+```
+
+OUTPUT (Success - 201):
+```javascript
+{
+  message: "Order placed successfully",
+  orderId: "507f1f77bcf86cd799439015",
+  orderNumber: "ORD-20251018-1234"
+}
+```
+
+STEP-BY-STEP LOGIC:
+```javascript
+place_order = async (req, res) => {
+  try {
+    // Step 1: Extract all data from request
+    const {
+      price, products, shipping_fee, shippingInfo,
+      userId, customerInfo, payment_method, payment_details
+    } = req.body;
+
+    // Step 2: Validate required fields
+    if (!price || !products || !shippingInfo || !userId) {
+      return responseReturn(res, 400, { message: 'Missing required fields' });
+    }
+
+    // Step 3: Fetch customer details if not provided
+    let finalCustomerInfo = customerInfo;
+    if (!customerInfo || !customerInfo.name || !customerInfo.email) {
+      const customer = await customerModel.findById(userId);
+      if (!customer) {
+        return responseReturn(res, 404, { message: 'Customer not found' });
+      }
+      finalCustomerInfo = {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone || ''
+      };
+    }
+
+    // Step 4: Generate unique order number
+    const orderNumber = generateOrderNumber();  // ORD-20251018-1234
+
+    // Step 5: Calculate totals
+    const subtotal = price;
+    const totalPrice = subtotal + (shipping_fee || 5);
+
+    // Step 6: Process products and prepare order data
+    let customerOrderProduct = [];
+    let cardId = [];
+
+    for (const group of products) {
+      const { sellerId, price: sellerPrice, products: items } = group;
+
+      for (const { productInfo, quantity, _id } of items) {
+        productInfo.quantity = quantity;
+        customerOrderProduct.push(productInfo);
+        if (_id) cardId.push(_id);  // Collect cart IDs for deletion
+      }
+    }
+
+    // Step 7: Create order in database
+    const order = await customerOrder.create({
+      customerId: userId,
+      orderNumber: orderNumber,
+      customerInfo: {
+        name: finalCustomerInfo.name,
+        email: finalCustomerInfo.email,
+        phone: finalCustomerInfo.phone || ''
+      },
+      shippingInfo: {
+        street: shippingInfo.street,
+        city: shippingInfo.city,
+        zipCode: shippingInfo.zipCode,
+        country: shippingInfo.country || 'United States'
+      },
+      products: customerOrderProduct,
+      subtotal: subtotal,
+      shipping_fee: shipping_fee || 5,
+      price: totalPrice,
+      payment_status: 'unpaid',
+      payment_method: payment_method || 'cash_on_delivery',
+      payment_details: {
+        cardHolder: payment_details?.cardHolder || '',
+        cardLastFour: payment_details?.cardLastFour || '',  // SECURITY: Only last 4 digits!
+        transactionId: ''
+      },
+      delivery_status: 'pending',
+      date: moment().format('LLL')
+    });
+
+    // Step 8: Clear cart items (optional - if cart IDs provided)
+    if (cardId.length > 0) {
+      await cardModel.deleteMany({ _id: { $in: cardId } });
+    }
+
+    // Step 9: Return success response
+    return responseReturn(res, 201, {
+      message: 'Order placed successfully',
+      orderId: order._id,
+      orderNumber: order.orderNumber
+    });
+
+  } catch (error) {
+    console.error('Place Order Error:', error);
+    return responseReturn(res, 500, { error: 'Internal Server Error' });
+  }
+};
+```
+
+HELPER FUNCTION: generateOrderNumber()
+---------------------------------------
+```javascript
+const generateOrderNumber = () => {
+  const date = moment().format('YYYYMMDD');  // 20251018
+  const random = Math.floor(1000 + Math.random() * 9000);  // 4-digit: 1000-9999
+  return `ORD-${date}-${random}`;  // ORD-20251018-1234
+};
+```
+
+SECURITY MEASURES:
+- ✅ Authentication required (authMiddleware)
+- ✅ Only last 4 digits of credit card stored (never full number!)
+- ✅ CVV is NEVER stored
+- ✅ Customer ID is validated against database
+- ✅ Order is linked to authenticated user
+
+WHY I MADE THESE DECISIONS:
+- I generate unique order numbers with date prefix for easy tracking
+- I store shipping address as structured object (not concatenated string)
+- I default to $5 shipping fee (business requirement)
+- I clear cart items after order to prevent duplicate orders
+- I never store full credit card numbers (PCI compliance)
+
+ERROR HANDLING STRATEGY:
+------------------------
+I implemented consistent error handling across all controllers:
+
+```javascript
+try {
+  // Business logic here
+  return responseReturn(res, 200, {
+    message: 'Success',
+    data: result
+  });
+} catch (error) {
+  console.error('Error in [method name]:', error);
+  return responseReturn(res, 500, {
+    error: error.message || 'Internal server error'
+  });
+}
+```
+
+I created a utility function for consistent responses:
+File: Ecommerce/backend/utiles/response.js
+
+```javascript
+export const responseReturn = (res, code, data) => {
+  return res.status(code).json(data);
+};
+```
+
+This ensures all API responses have a consistent structure.
+
+================================================================================
+              5. API INTEGRATION - HOW I BUILT IT (ENHANCED)
+================================================================================
+
+In this section, I'll explain in detail how I created the API client for the
+mobile app, including interceptors, error handling, and authentication.
+
+FILE: Ecommerce_App/src/api/api.js
+PURPOSE: Centralized HTTP client for all API requests
+
+--------------------------------------------------------------------------------
+                    5.1 AXIOS INSTANCE CONFIGURATION
+--------------------------------------------------------------------------------
+
+STEP 1: Import Dependencies
+----------------------------
+```javascript
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+```
+
+Why I chose these:
+- axios: Industry-standard HTTP client with interceptor support
+- AsyncStorage: React Native's persistent storage (like localStorage)
+- Constants: Access Expo configuration for dynamic API URL
+
+STEP 2: Configure Base URL
+---------------------------
+```javascript
+const BASE_URL = Constants?.expoConfig?.extra?.apiUrl || 'http://localhost:5001/api';
+```
+
+How this works:
+- I read the API URL from app.config.js (extra.apiUrl)
+- This allows different URLs for development vs production
+- Falls back to localhost if not configured
+
+In app.config.js:
+```javascript
+export default {
+  extra: {
+    apiUrl: process.env.API_URL || 'http://localhost:5001/api'
+  }
+};
+```
+
+STEP 3: Create Axios Instance
+------------------------------
+```javascript
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 15000,  // 15 seconds
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
+```
+
+Configuration explained:
+- baseURL: All requests are relative to this URL
+  Example: api.post('/customer/login') → http://localhost:5001/api/customer/login
+- timeout: Request fails if no response in 15 seconds
+- headers: Default headers for all requests
+
+--------------------------------------------------------------------------------
+                    5.2 REQUEST INTERCEPTOR (DETAILED)
+--------------------------------------------------------------------------------
+
+PURPOSE: Automatically add authentication token and headers to EVERY request
+
+```javascript
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      // STEP 1: Retrieve token from AsyncStorage
+      const customerToken = await AsyncStorage.getItem('customerToken');
+
+      // STEP 2: Add token to Authorization header if it exists
+      if (customerToken) {
+        config.headers.Authorization = `Bearer ${customerToken}`;
+      }
+
+      // STEP 3: Add mobile client identifiers
+      config.headers['X-Client-Type'] = 'mobile';
+      config.headers['X-Platform'] = 'react-native';
+
+      // STEP 4: Log the request for debugging
+      console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+
+    } catch (error) {
+      console.error('Error in request interceptor:', error);
+    }
+
+    // STEP 5: Return modified config
+    return config;
+  },
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+```
+
+REAL-WORLD EXAMPLE:
+-------------------
+When I call: `api.post('/customer/login', { email, password })`
+
+Before interceptor:
+```javascript
+POST http://localhost:5001/api/customer/login
+Headers: {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+}
+Body: { email: "john@example.com", password: "password123" }
+```
+
+After interceptor:
+```javascript
+POST http://localhost:5001/api/customer/login
+Headers: {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  'X-Client-Type': 'mobile',
+  'X-Platform': 'react-native'
+}
+Body: { email: "john@example.com", password: "password123" }
+```
+
+WHY THIS IS IMPORTANT:
+- I don't have to manually add the token to every API call
+- The backend can identify mobile vs web requests (X-Client-Type)
+- Centralized authentication logic (DRY principle)
+
+--------------------------------------------------------------------------------
+                    5.3 RESPONSE INTERCEPTOR (DETAILED)
+--------------------------------------------------------------------------------
+
+PURPOSE: Handle responses and errors globally
+
+```javascript
+api.interceptors.response.use(
+  (response) => {
+    // SUCCESS CASE: Status 200-299
+    console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+    console.log('Response data:', response.data);
+    return response;
+  },
+  async (error) => {
+    // ERROR CASE: Status 400-599 or network error
+    console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`);
+    console.error('Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code
+    });
+
+    // HANDLE 401 UNAUTHORIZED (Token expired or invalid)
+    if (error.response?.status === 401) {
+      // Clear stored authentication data
+      await AsyncStorage.multiRemove(['customerToken', 'customerInfo']);
+      console.log('🔄 Cleared expired authentication data');
+
+      // Optional: Navigate to login screen
+      // NavigationService.navigate('Login');
+    }
+
+    // HANDLE NETWORK ERRORS (Server not reachable)
+    if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+      console.error('🌐 Network Error: Check if backend server is running');
+      error.message = 'Unable to connect to server. Please check your internet connection.';
+    }
+
+    // HANDLE TIMEOUT ERRORS
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'Request timeout. Please try again.';
+    }
+
+    return Promise.reject(error);
+  }
+);
+```
+
+ERROR HANDLING SCENARIOS:
+-------------------------
+
+Scenario 1: Token Expired (401)
+```javascript
+// User makes a request with expired token
+api.get('/home/customer/get-orders/123/all')
+
+// Response: 401 Unauthorized
+// Interceptor automatically:
+// 1. Clears AsyncStorage (customerToken, customerInfo)
+// 2. Logs the action
+// 3. User is effectively logged out
+```
+
+Scenario 2: Network Error (Server Down)
+```javascript
+// User makes a request but server is offline
+api.post('/customer/login', { email, password })
+
+// Error: Network Error
+// Interceptor automatically:
+// 1. Detects network error
+// 2. Changes error message to user-friendly text
+// 3. Returns: "Unable to connect to server. Please check your internet connection."
+```
+
+Scenario 3: Timeout (15 seconds)
+```javascript
+// User makes a request but server is slow
+api.get('/home/query-products?...')
+
+// Error: ECONNABORTED (timeout)
+// Interceptor automatically:
+// 1. Detects timeout
+// 2. Changes error message to: "Request timeout. Please try again."
+```
+
+--------------------------------------------------------------------------------
+                    5.4 HOW INTERCEPTORS WORK WITH REDUX
+--------------------------------------------------------------------------------
+
+COMPLETE FLOW EXAMPLE: User Login
+----------------------------------
+
+Step 1: User clicks "Login" button
+```javascript
+// LoginScreen.js
+dispatch(customer_login({ email, password }));
+```
+
+Step 2: Redux async thunk makes API call
+```javascript
+// authReducer.js
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.post('/customer/login', info);
+      // ... save token to AsyncStorage
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+Step 3: Request interceptor runs
+```javascript
+// api.js - Request Interceptor
+// Adds headers, logs request
+// (No token yet since this is login)
+```
+
+Step 4: Server responds with token
+```javascript
+// Response: { token: "...", userInfo: {...} }
+```
+
+Step 5: Response interceptor runs
+```javascript
+// api.js - Response Interceptor
+// Logs success, returns response
+```
+
+Step 6: Redux saves token to AsyncStorage
+```javascript
+// authReducer.js
+await AsyncStorage.setItem('customerToken', data.token);
+```
+
+Step 7: Next API call automatically includes token
+```javascript
+// User navigates to Orders screen
+api.get('/home/customer/get-orders/123/all')
+
+// Request interceptor reads token from AsyncStorage
+// Adds: Authorization: Bearer <token>
+// Server receives authenticated request ✅
+```
+
+DIAGRAM:
+```
+User Action
+    ↓
+Redux Async Thunk
+    ↓
+api.post('/endpoint', data)
+    ↓
+Request Interceptor
+    ├─ Read token from AsyncStorage
+    ├─ Add Authorization header
+    ├─ Add mobile identifiers
+    └─ Log request
+    ↓
+HTTP Request → Server
+    ↓
+Server Response
+    ↓
+Response Interceptor
+    ├─ Log response
+    ├─ Handle 401 (clear auth)
+    ├─ Handle network errors
+    └─ Return response/error
+    ↓
+Redux Reducer
+    ├─ Update state
+    └─ Save token (if login)
+    ↓
+UI Update
+```
+
+WHY I BUILT IT THIS WAY:
+- ✅ Centralized authentication logic (DRY)
+- ✅ Automatic token management (no manual header setting)
+- ✅ Global error handling (consistent UX)
+- ✅ Easy debugging (all requests/responses logged)
+- ✅ Automatic logout on token expiration
+- ✅ User-friendly error messages
+
+================================================================================
+                    6. REDUX STATE MANAGEMENT (MOBILE APP)
+================================================================================
+
+I implemented Redux Toolkit for state management in the React Native mobile app.
+
+REDUX STORE STRUCTURE:
+----------------------
+File: Ecommerce_App/src/store/index.js
+
+I configured the store with:
+  - Redux Persist (to save auth and cart data locally)
+  - AsyncStorage (React Native's local storage)
+  - Combined reducers for different domains
+
+```javascript
+const persistConfig = {
+  key: 'root',
+  storage: AsyncStorage,
+  whitelist: ['auth', 'card'], // I only persist auth and cart
+};
+
+const rootReducer = combineReducers({
+  auth: authReducer,      // Authentication state
+  home: homeReducer,      // Products, categories
+  card: cardReducer,      // Shopping cart
+  order: orderReducer,    // Orders
+});
+```
+
+Why I chose this structure:
+  - Persisting 'auth' keeps users logged in between app sessions
+  - Persisting 'card' saves cart items even if app is closed
+  - NOT persisting 'home' ensures fresh product data on each launch
+  - NOT persisting 'order' reduces storage usage
+
+REDUCER 1: AUTH REDUCER
+-----------------------
+File: Ecommerce_App/src/store/reducers/authReducer.js
+
+State I manage:
+```javascript
+{
+  loader: false,          // Loading indicator
+  userInfo: null,         // User profile data
+  errorMessage: '',       // Error messages
+  successMessage: '',     // Success messages
+  token: null,            // JWT token
+}
+```
+
+Async actions I created:
+  - customer_login: Authenticate user and store token
+  - customer_register: Create new account
+
+Key implementation detail:
+```javascript
+export const customer_login = createAsyncThunk(
+  'auth/customer_login',
+  async (info, { rejectWithValue, fulfillWithValue }) => {
+    try {
+      const { data } = await api.post('/customer/login', info);
+
+      // I persist token and user info to AsyncStorage
+      if (data?.token) {
+        await AsyncStorage.setItem('customerToken', data.token);
+      }
+      if (data?.userInfo) {
+        await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+      }
+
+      return fulfillWithValue(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data);
+    }
+  }
+);
+```
+
+Why this is important: I store the token in AsyncStorage so the API client can
+automatically add it to all requests via interceptors.
+
+REDUCER 2: CART REDUCER
+-----------------------
+File: Ecommerce_App/src/store/reducers/cardReducer.js
+
+State I manage:
+```javascript
+{
+  card_products: [],      // Cart items
+  card_product_count: 0,  // Total items in cart
+  price: 0,               // Subtotal
+  shipping_fee: 0,        // Shipping cost
+  outofstock_products: [], // Out of stock items
+}
+```
+
+Async actions I created:
+  - add_to_card: Add product to cart
+  - get_card_products: Fetch cart items
+  - delete_card_product: Remove item
+  - quantity_inc/quantity_dec: Update quantities
+
+Key feature I implemented - Optimistic updates:
+```javascript
+.addCase(add_to_card.fulfilled, (state, { payload }) => {
+  state.successMessage = payload.message;
+  state.card_product_count = state.card_product_count + 1; // Immediate UI update
+})
+```
+
+This makes the UI feel instant - the cart count updates immediately without
+waiting for the server response.
+
+REDUCER 3: HOME REDUCER
+-----------------------
+File: Ecommerce_App/src/store/reducers/homeReducer.js
+
+State I manage:
+```javascript
+{
+  categorys: [],          // All categories
+  products: [],           // Current product list
+  totalProduct: 0,        // Total count for pagination
+  parPage: 12,            // Items per page
+  latest_product: [],     // Latest products
+  topRated_product: [],   // Top rated products
+  discount_product: [],   // Discounted products
+  product: {},            // Single product details
+  relatedProducts: [],    // Related products
+}
+```
+
+Async actions I created:
+  - get_categorys: Fetch all categories
+  - get_products: Fetch featured products
+  - query_products: Advanced search with filters
+  - product_details: Get single product
+
+REDUCER 4: ORDER REDUCER
+------------------------
+File: Ecommerce_App/src/store/reducers/orderReducer.js
+
+State I manage:
+```javascript
+{
+  myOrders: [],           // User's order history
+  order: {},              // Single order details
+  loader: false,          // Loading state
+  errorMessage: '',       // Error messages
+  successMessage: '',     // Success messages
+}
+```
+
+Async actions I created:
+  - place_order: Create new order
+  - get_orders: Fetch user's orders
+  - get_order_details: Get single order
+
+API CLIENT INTEGRATION:
+-----------------------
+File: Ecommerce_App/src/api/api.js
+
+I created an Axios instance with interceptors for automatic token handling:
+
+```javascript
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
+
+// Request interceptor - I add auth token automatically
+api.interceptors.request.use(async (config) => {
+  // Get token from AsyncStorage
+  const customerToken = await AsyncStorage.getItem('customerToken');
+  if (customerToken) {
+    config.headers.Authorization = `Bearer ${customerToken}`;
+  }
+
+  // Add mobile client identifier
+  config.headers['X-Client-Type'] = 'mobile';
+  config.headers['X-Platform'] = 'react-native';
+
+  return config;
+});
+
+// Response interceptor - I handle errors globally
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expired - clear auth data
+      await AsyncStorage.multiRemove(['customerToken', 'customerInfo']);
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+Why this is powerful: Every API call automatically includes the auth token, and
+if the token expires (401 error), I automatically clear it and the user is
+logged out. This happens globally without needing to handle it in every component.
+
+================================================================================
+                5. DATABASE SYNCHRONIZATION & DATA FLOW
+================================================================================
+
+I designed the system to ensure perfect data synchronization between:
+  1. React Website (Ecommerce/frontend)
+  2. React Native Mobile App (Ecommerce_App)
+  3. Admin Dashboard (Ecommerce/dashboard)
+
+All three platforms share the SAME backend API and MongoDB database.
+
+DATA FLOW ARCHITECTURE:
+-----------------------
+
+Admin Dashboard → MongoDB → Website/Mobile App
+     ↓              ↓              ↓
+  [Create]      [Store]        [Display]
+  [Update]      [Validate]     [Sync]
+  [Delete]      [Index]        [Real-time]
+
+MONGODB SCHEMA DESIGN:
+----------------------
+
+1. Product Schema (productModel.js):
+```javascript
+{
+  sellerId: ObjectId,           // Reference to seller
+  name: String (required),      // Product name
+  slug: String (required),      // URL-friendly name
+  category: String (required),  // Category name
+  brand: String (required),     // Brand name
+  price: Number (required),     // Base price
+  stock: Number (required),     // Available quantity
+  discount: Number (default 0), // Discount percentage
+  description: String,          // Product description
+  shopName: String,             // Shop name
+  images: [String],             // Cloudinary URLs
+  rating: Number (default 0),   // Average rating
+  timestamps: true              // createdAt, updatedAt
+}
+```
+
+I added text indexes for search:
+```javascript
+productSchema.index(
+  { name: 'text', category: 'text', brand: 'text', description: 'text' },
+  { weights: { name: 5, category: 4, brand: 3, description: 2 } }
+);
+```
+
+This allows fast full-text search across multiple fields with weighted relevance.
+
+2. Customer Order Schema (customerOrder.js):
+```javascript
+{
+  customerId: ObjectId (required),     // Reference to customer
+  orderNumber: String (unique),        // ORD-YYYYMMDD-XXXX
+  customerInfo: {
+    name: String,
+    email: String,
+    phone: String
+  },
+  products: Array,                     // Ordered products
+  subtotal: Number,                    // Price before shipping
+  shipping_fee: Number (default 5),    // Fixed $5 shipping
+  price: Number,                       // Total price
+  payment_status: Enum,                // unpaid/paid/refunded
+  payment_method: Enum,                // credit_card/paypal/cash_on_delivery
+  payment_details: {
+    cardHolder: String,
+    cardLastFour: String,              // Only last 4 digits (security!)
+    transactionId: String
+  },
+  shippingInfo: {                      // Structured address
+    street: String,
+    city: String,
+    zipCode: String,
+    country: String
+  },
+  delivery_status: Enum,               // pending/processing/shipped/delivered/cancelled
+  date: String,                        // Formatted date
+  timestamps: true
+}
+```
+
+Key security decision I made: I NEVER store full credit card numbers or CVV -
+only the last 4 digits and cardholder name. This protects customer data.
+
+3. Customer Schema (customerModel.js):
+```javascript
+{
+  name: String (required),
+  email: String (required, unique),
+  password: String (required, hashed),
+  phone: String,
+  address: String,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+I hash passwords with bcrypt before storing:
+```javascript
+const hashedPassword = await bcrypt.hash(password, 10);
+```
+
+SYNCHRONIZATION STRATEGY:
+--------------------------
+
+How I ensure data consistency across all platforms:
+
+1. Single Source of Truth (MongoDB):
+   - All platforms read from and write to the same MongoDB database
+   - No local databases or caching that could get out of sync
+
+2. Shared API Endpoints:
+   Website, Mobile App, and Dashboard all use the same endpoints:
+
+   Products:
+     GET  /api/home/get-products          (Featured products)
+     GET  /api/home/get-categorys         (All categories)
+     GET  /api/home/query-products        (Search & filter)
+     GET  /api/home/product-details/:slug (Single product)
+
+   Cart:
+     POST   /api/home/product/add-to-card           (Add to cart)
+     GET    /api/home/product/get-card-product/:id  (Get cart)
+     DELETE /api/home/product/delete-card-product/:id (Remove item)
+     PUT    /api/home/product/quantity-inc/:id      (Increase qty)
+     PUT    /api/home/product/quantity-dec/:id      (Decrease qty)
+
+   Orders:
+     POST /api/home/order/place-order                    (Create order)
+     GET  /api/home/customer/get-orders/:id/:status      (Get orders)
+     GET  /api/home/customer/get-order-details/:orderId  (Order details)
+
+   Authentication:
+     POST /api/customer/register  (Create account)
+     POST /api/customer/login     (Login)
+     POST /api/customer/logout    (Logout)
+
+   Admin (Dashboard only):
+     POST   /api/dashboard/product-add        (Create product)
+     PUT    /api/dashboard/product-update     (Update product)
+     DELETE /api/dashboard/product-delete/:id (Delete product)
+
+3. Real-time Updates:
+   I implemented Socket.io for real-time chat, but kept product/order data
+   REST-based for simplicity and caching.
+
+4. Data Validation:
+   I validate data at multiple levels:
+   - Frontend: Form validation (React Hook Form)
+   - API: Request validation (Express middleware)
+   - Database: Schema validation (Mongoose)
+
+Example validation flow for creating a product:
+```
+Admin Dashboard (React)
+  ↓ [Validates: name, price, stock, category]
+Express API
+  ↓ [Validates: required fields, data types]
+Mongoose Schema
+  ↓ [Validates: schema constraints, unique fields]
+MongoDB
+  ↓ [Stores validated data]
+```
+
+5. Image Synchronization:
+   I use Cloudinary for ALL product images:
+   - Admin uploads image → Cloudinary → URL stored in MongoDB
+   - Website/Mobile app fetches product → Gets Cloudinary URL → Displays image
+
+   This ensures images are always accessible and consistent across platforms.
+
+TESTING SYNCHRONIZATION:
+------------------------
+
+I tested cross-platform sync by:
+  1. Creating product in Admin Dashboard
+  2. Verifying it appears on Website immediately
+  3. Verifying it appears in Mobile App immediately
+  4. Updating product in Dashboard
+  5. Verifying changes reflect everywhere
+  6. Placing order on Mobile App
+  7. Verifying order appears in Website order history
+  8. Verifying order appears in Admin Dashboard
+
+Result: Perfect synchronization! ✅
+
+================================================================================
+                6. KEY TECHNICAL DECISIONS & SOLUTIONS
+================================================================================
+
+DECISION 1: JWT vs Session-Based Authentication
+------------------------------------------------
+I chose JWT (JSON Web Tokens) because:
+  ✅ Stateless - no server-side session storage needed
+  ✅ Works perfectly with mobile apps (no cookie issues)
+  ✅ Can be stored in AsyncStorage (mobile) or localStorage (web)
+  ✅ Includes user info (id, role) in the token itself
+  ✅ Easy to implement role-based access control
+
+Implementation:
+```javascript
+// Generate token on login
+const token = jwt.sign(
+  { id: user._id, role: user.role },
+  process.env.JWT_SECRET,
+  { expiresIn: '7d' }
+);
+
+// Verify token in middleware
+const decoded = jwt.verify(token, process.env.JWT_SECRET);
+req.id = decoded.id;
+req.role = decoded.role;
+```
+
+DECISION 2: Redux Toolkit vs Context API
+-----------------------------------------
+I chose Redux Toolkit for the mobile app because:
+  ✅ Built-in async handling with createAsyncThunk
+  ✅ Redux Persist for offline data
+  ✅ Excellent DevTools for debugging
+  ✅ Centralized state management
+  ✅ Immutability built-in (no accidental mutations)
+
+I used Context API only for simple, localized state (like cart context for
+quick updates).
+
+DECISION 3: Cloudinary vs Local Storage for Images
+---------------------------------------------------
+I chose Cloudinary for ALL product images because:
+  ✅ No server storage needed (saves disk space)
+  ✅ Automatic image optimization and resizing
+  ✅ CDN delivery (fast loading worldwide)
+  ✅ Works seamlessly with mobile apps
+  ✅ No CORS issues
+  ✅ Reliable and scalable
+
+Implementation:
+```javascript
+// Upload to Cloudinary
+const result = await cloudinary.uploader.upload(imagePath, {
+  folder: 'products',
+  transformation: [
+    { width: 800, height: 800, crop: 'limit' },
+    { quality: 'auto' }
+  ]
+});
+
+// Store URL in MongoDB
+product.images.push(result.secure_url);
+```
+
+DECISION 4: Structured Addresses vs Concatenated Strings
+---------------------------------------------------------
+I chose structured address objects instead of concatenated strings:
+
+❌ Bad approach (concatenated):
+```javascript
+shippingAddress: "123 Main St, New York, NY 10001, USA"
+```
+
+✅ My approach (structured):
+```javascript
+shippingInfo: {
+  street: "123 Main St",
+  city: "New York",
+  zipCode: "10001",
+  country: "USA"
+}
+```
+
+Why this is better:
+  - Easy to search/filter by city or country
+  - Can validate each field separately
+  - Can format addresses differently for different regions
+  - Can integrate with shipping APIs easily
+
+DECISION 5: Order Number Format (ORD-YYYYMMDD-XXXX)
+----------------------------------------------------
+I designed a custom order number format for easy tracking:
+
+Format: ORD-20251018-0001
+  - ORD: Prefix for easy identification
+  - 20251018: Date (YYYYMMDD) for chronological sorting
+  - 0001: Sequential number for uniqueness
+
+Benefits:
+  ✅ Human-readable and memorable
+  ✅ Easy to search in chatbot ("ORD-20251018-0001")
+  ✅ Chronologically sortable
+  ✅ Unique across all orders
+
+Implementation:
+```javascript
+const generateOrderNumber = () => {
+  const date = new Date();
+  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `ORD-${dateStr}-${random}`;
+};
+```
+
+DECISION 6: Fixed Shipping Fee vs Dynamic Calculation
+------------------------------------------------------
+I chose a fixed $5 shipping fee for simplicity:
+  ✅ Easy to understand for customers
+  ✅ No complex calculations needed
+  ✅ Predictable costs
+  ✅ Can be changed easily in one place
+
+Future enhancement: I can add dynamic shipping based on weight/distance later.
+
+DECISION 7: English Language & US Dollars
+------------------------------------------
+I standardized the project to use:
+  - English language (not Hebrew) for customer-facing content
+  - US Dollars ($) as currency (not Israeli Shekels)
+  - $5 fixed shipping fee
+
+Why: This makes the project more universally applicable and easier to present
+to international audiences.
+
+DECISION 8: Expo vs React Native CLI
+-------------------------------------
+I chose Expo for the mobile app because:
+  ✅ Faster development (no native code setup)
+  ✅ Easy testing via QR code (Expo Go app)
+  ✅ Built-in libraries (camera, location, etc.)
+  ✅ Over-the-air updates
+  ✅ Great developer experience
+
+Trade-off: Limited access to some native modules, but for an e-commerce app,
+Expo provides everything needed.
+
+================================================================================
+                7. IMPORTANT CODE SECTIONS & ALGORITHMS
+================================================================================
+
+ALGORITHM 1: Product Search with Keyword Extraction
+----------------------------------------------------
+File: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+This is one of my most sophisticated algorithms:
+
+```javascript
+_searchProducts = async (message, budget = null) => {
+  const lowerMessage = message.toLowerCase();
+
+  // Step 1: Extract meaningful keywords (remove stop words)
+  const stopWords = ['show', 'me', 'find', 'looking', 'for', 'need',
+                     'want', 'buy', 'get', 'a', 'an', 'the', 'some',
+                     'any', 'do', 'you', 'have', 'i', 'am', 'is', 'are'];
+
+  const words = lowerMessage.split(/\s+/).filter(word =>
+    word.length > 2 && !stopWords.includes(word)
+  );
+
+  // Step 2: Normalize words (handle singular/plural)
+  const searchConditions = [];
+  words.forEach(word => {
+    const normalizedWord = this._normalizeWord(word);
+
+    // Step 3: Build MongoDB query with OR conditions
+    searchConditions.push({
+      $or: [
+        { name: { $regex: normalizedWord, $options: 'i' } },
+        { description: { $regex: normalizedWord, $options: 'i' } },
+        { category: { $regex: normalizedWord, $options: 'i' } },
+        { brand: { $regex: normalizedWord, $options: 'i' } }
+      ]
+    });
+  });
+
+  // Step 4: Combine conditions with AND logic
+  const searchQuery = {
+    $and: [
+      { $or: searchConditions }
+    ]
+  };
+
+  // Step 5: Add budget filter if specified
+  if (budget) {
+    searchQuery.$and.push({
+      $expr: {
+        $lte: [
+          { $multiply: ['$price', { $subtract: [1, { $divide: ['$discount', 100] }] }] },
+          budget
+        ]
+      }
+    });
+  }
+
+  // Step 6: Execute search with sorting
+  const products = await productModel
+    .find(searchQuery)
+    .select('name description price discount stock category brand rating images slug')
+    .sort({ rating: -1, discount: -1 })  // Prioritize high-rated and discounted
+    .limit(15);
+
+  return products;
+};
+```
+
+Why this is impressive:
+  1. Extracts meaningful keywords from natural language
+  2. Handles singular/plural variations automatically
+  3. Searches across multiple fields (name, description, category, brand)
+  4. Supports budget filtering with discount calculation
+  5. Prioritizes high-rated and discounted products
+  6. Case-insensitive search
+  7. Returns top 15 results for performance
+
+ALGORITHM 2: Language Detection
+--------------------------------
+File: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+```javascript
+_detectLanguage = (message) => {
+  // Hebrew Unicode range: U+0590 to U+05FF
+  const hebrewPattern = /[\u0590-\u05FF]/;
+  const hasHebrew = hebrewPattern.test(message);
+
+  // English letters: a-z, A-Z
+  const englishPattern = /[a-zA-Z]/;
+  const hasEnglish = englishPattern.test(message);
+
+  // Determine language based on character presence
+  if (hasHebrew && !hasEnglish) return 'hebrew';
+  if (hasEnglish && !hasHebrew) return 'english';
+  if (hasHebrew && hasEnglish) return 'mixed';
+
+  return 'english'; // Default to English
+};
+```
+
+This uses Unicode ranges to detect Hebrew characters, which is more reliable
+than checking for specific words.
+
+ALGORITHM 3: Order Number Extraction with Regex
+------------------------------------------------
+File: Ecommerce/backend/controllers/chat/ChatbotController.js
+
+```javascript
+_extractOrderNumber = (message) => {
+  // Pattern: ORD-YYYYMMDD-XXXX
+  const orderPattern = /ORD-\d{8}-\d{4}/i;
+  const match = message.match(orderPattern);
+  return match ? match[0].toUpperCase() : null;
+};
+```
+
+This regex pattern matches the exact order number format I designed, making it
+easy for users to track orders by simply typing the order number in the chatbot.
+
+ALGORITHM 4: Random Product Shuffling
+--------------------------------------
+File: Ecommerce/backend/controllers/home/homeControllers.js
+
+For the "Shop All" view, I implemented random product shuffling:
+
+```javascript
+if (random === 'true') {
+  // Use MongoDB aggregation for efficient random sampling
+  products = await productModel.aggregate([
+    { $match: query },
+    { $sample: { size: totalProduct } },  // Random shuffle
+    { $skip: skipPage },
+    { $limit: parPage }
+  ]);
+} else {
+  // Normal sorting by creation date
+  products = await productModel
+    .find(query)
+    .sort({ createdAt: -1 })
+    .skip(skipPage)
+    .limit(parPage);
+}
+```
+
+Why I use $sample: It's much more efficient than sorting by a random field,
+especially with large datasets.
+
+ALGORITHM 5: Discount Price Calculation
+----------------------------------------
+Throughout the app, I calculate discounted prices consistently:
+
+```javascript
+const calculateDiscountedPrice = (price, discount) => {
+  const discountAmount = (price * discount) / 100;
+  const finalPrice = price - discountAmount;
+  return finalPrice.toFixed(2);
+};
+
+// Example: $100 with 20% discount = $80.00
+```
+
+I always use .toFixed(2) to ensure prices have exactly 2 decimal places.
+
+================================================================================
+                        8. PRESENTATION KEY POINTS
+================================================================================
+
+OPENING STATEMENT:
+------------------
+"I built a full-stack e-commerce platform using the MERN stack with a React
+Native mobile app. The system includes a customer-facing website, a mobile app,
+and an admin dashboard - all synchronized through a single backend API and
+MongoDB database. The standout feature is an AI-powered chatbot that uses
+OpenAI's GPT-4o-mini to provide intelligent product recommendations and order
+tracking."
+
+IMPRESSIVE FEATURES TO HIGHLIGHT:
+---------------------------------
+
+1. AI CHATBOT WITH OPENAI INTEGRATION ⭐⭐⭐
+   "I integrated OpenAI's GPT-4o-mini model to create an intelligent chatbot
+   that understands natural language queries. It can search for products,
+   provide recommendations, and track orders. I implemented sophisticated
+   keyword extraction and singular/plural normalization to improve search
+   accuracy. The chatbot also detects the user's language (English or Hebrew)
+   and responds consistently in that language."
+
+   Demo: "For example, if a user types 'laptops for students', the chatbot
+   extracts 'laptop' and 'student', searches the database, and returns relevant
+   products with AI-generated recommendations."
+
+2. CROSS-PLATFORM SYNCHRONIZATION ⭐⭐⭐
+   "I designed the architecture so that the React website, React Native mobile
+   app, and admin dashboard all share the same backend API and MongoDB database.
+   This means when an admin adds a product, it immediately appears on both the
+   website and mobile app. Orders placed on the mobile app instantly show up in
+   the admin dashboard. I achieved this by using a single source of truth - the
+   MongoDB database - and shared API endpoints."
+
+3. OPTIONAL AUTHENTICATION MIDDLEWARE ⭐⭐
+   "I created a custom authentication middleware that allows the chatbot to work
+   for both guest users and logged-in customers. Guest users can browse products
+   and get recommendations without logging in, but order tracking requires
+   authentication. This was a clever solution to a security challenge - I needed
+   to protect user orders while keeping the chatbot accessible to everyone."
+
+4. SECURE ORDER TRACKING ⭐⭐
+   "I implemented multi-layer security for order tracking. First, I check if the
+   user is authenticated. Second, I filter all database queries by the user's
+   customerId to ensure they can only see their own orders. I also designed a
+   unique order number format (ORD-YYYYMMDD-XXXX) that's easy to remember and
+   search for in the chatbot."
+
+5. REDUX STATE MANAGEMENT WITH PERSISTENCE ⭐⭐
+   "I implemented Redux Toolkit with Redux Persist in the mobile app to manage
+   state efficiently. Authentication and cart data persist locally using
+   AsyncStorage, so users stay logged in and their cart is saved even if they
+   close the app. I used createAsyncThunk for all API calls, which provides
+   built-in loading states and error handling."
+
+6. CLOUDINARY IMAGE MANAGEMENT ⭐
+   "I integrated Cloudinary for all product images instead of storing them
+   locally. This provides automatic image optimization, CDN delivery for fast
+   loading, and eliminates server storage concerns. Images are accessible from
+   all platforms without CORS issues."
+
+7. INTELLIGENT PRODUCT SEARCH ⭐⭐
+   "I built a sophisticated product search algorithm that extracts keywords from
+   natural language queries, removes stop words, normalizes singular/plural
+   forms, and searches across multiple fields (name, description, category,
+   brand) with weighted relevance. It also supports budget filtering and
+   prioritizes high-rated and discounted products."
+
+TECHNICAL CHALLENGES I OVERCAME:
+---------------------------------
+
+Challenge 1: "Chatbot Authentication Conflict"
+  Problem: "When I added authentication to fix a security issue, the chatbot
+  stopped working for guest users."
+
+  Solution: "I created an optional authentication middleware that extracts user
+  info if a token is present but allows the request to continue as a guest if
+  not. This single middleware handles both authenticated and guest users
+  elegantly."
+
+Challenge 2: "Product Search Not Finding Results"
+  Problem: "Users were searching for 'laptops' but products were named 'laptop'
+  (singular), so searches failed."
+
+  Solution: "I implemented a word normalization function that removes plural
+  endings ('s') before searching. Now 'laptops' → 'laptop' and the search works
+  perfectly."
+
+Challenge 3: "Language Inconsistency in AI Responses"
+  Problem: "The chatbot was responding in Hebrew when users wrote in English."
+
+  Solution: "I implemented language detection using Unicode ranges to identify
+  Hebrew vs English characters, then enforce language consistency in the OpenAI
+  system prompt."
+
+Challenge 4: "Cross-Platform Data Synchronization"
+  Problem: "How to keep website, mobile app, and admin dashboard in sync?"
+
+  Solution: "I designed a single backend API that all three platforms use. They
+  all read from and write to the same MongoDB database, ensuring perfect
+  synchronization."
+
+ARCHITECTURE DIAGRAM (TEXT FORMAT):
+------------------------------------
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENT LAYER                            │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│  React Website  │  React Native   │    Admin Dashboard          │
+│  (Customers)    │   Mobile App    │   (Admin/Sellers)           │
+│                 │   (Customers)   │                             │
+└────────┬────────┴────────┬────────┴────────┬────────────────────┘
+         │                 │                 │
+         │    HTTP/HTTPS   │   HTTP/HTTPS    │   HTTP/HTTPS
+         │    REST API     │   REST API      │   REST API
+         │                 │                 │
+         └─────────────────┼─────────────────┘
+                           │
+                           ▼
+         ┌─────────────────────────────────────────┐
+         │         EXPRESS.JS API SERVER           │
+         │              (Port 5001)                │
+         ├─────────────────────────────────────────┤
+         │  ┌──────────────────────────────────┐   │
+         │  │      Middleware Layer            │   │
+         │  │  - CORS                          │   │
+         │  │  - JWT Authentication            │   │
+         │  │  - Optional Authentication       │   │
+         │  │  - Request Logging               │   │
+         │  │  - Error Handling                │   │
+         │  └──────────────────────────────────┘   │
+         │  ┌──────────────────────────────────┐   │
+         │  │      Controllers Layer           │   │
+         │  │  - ChatbotController             │   │
+         │  │  - OrderController               │   │
+         │  │  - ProductController             │   │
+         │  │  - CustomerAuthController        │   │
+         │  │  - HomeController                │   │
+         │  │  - CardController                │   │
+         │  └──────────────────────────────────┘   │
+         │  ┌──────────────────────────────────┐   │
+         │  │      Services Layer              │   │
+         │  │  - OpenAI Service (GPT-4o-mini)  │   │
+         │  │  - Cloudinary Service            │   │
+         │  │  - Socket.io Service             │   │
+         │  └──────────────────────────────────┘   │
+         └────────────────┬────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────┐
+         │         MONGODB DATABASE                │
+         ├─────────────────────────────────────────┤
+         │  Collections:                           │
+         │  - products (125 products)              │
+         │  - customerOrders                       │
+         │  - customers                            │
+         │  - categories (6 categories)            │
+         │  - cardModel (shopping carts)           │
+         │  - sellers                              │
+         │  - reviews                              │
+         └─────────────────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────┐
+         │      EXTERNAL SERVICES                  │
+         ├─────────────────────────────────────────┤
+         │  - OpenAI API (GPT-4o-mini)             │
+         │  - Cloudinary (Image Storage & CDN)     │
+         └─────────────────────────────────────────┘
+```
+
+DATA FLOW EXAMPLE - PLACING AN ORDER:
+--------------------------------------
+
+```
+Mobile App (CheckoutScreen)
+  │
+  ├─ User fills shipping address
+  ├─ User selects payment method
+  ├─ User clicks "Place Order"
+  │
+  ▼
+Redux Action (place_order)
+  │
+  ├─ Dispatches async thunk
+  ├─ Shows loading indicator
+  │
+  ▼
+API Client (api.js)
+  │
+  ├─ Adds JWT token to headers
+  ├─ POST /api/home/order/place-order
+  │
+  ▼
+Express Server (orderController.js)
+  │
+  ├─ Validates authentication (authMiddleware)
+  ├─ Validates order data
+  ├─ Generates order number (ORD-20251018-1234)
+  ├─ Calculates total price
+  │
+  ▼
+MongoDB (customerOrders collection)
+  │
+  ├─ Saves order document
+  ├─ Returns order ID
+  │
+  ▼
+Response to Mobile App
+  │
+  ├─ Success message
+  ├─ Order number
+  │
+  ▼
+Redux Reducer (orderSlice)
+  │
+  ├─ Updates state (loader: false)
+  ├─ Sets success message
+  │
+  ▼
+UI Update
+  │
+  ├─ Navigates to OrderConfirmation screen
+  ├─ Displays order number
+  ├─ Clears cart
+  │
+  ▼
+Admin Dashboard
+  │
+  └─ Order appears in real-time (same database!)
+```
+
+CLOSING STATEMENT:
+------------------
+"This project demonstrates my ability to build a complete, production-ready
+e-commerce platform from scratch. I handled everything from database design and
+backend API development to frontend implementation and mobile app development.
+The AI chatbot integration showcases my ability to work with modern AI APIs,
+while the cross-platform synchronization demonstrates my understanding of
+system architecture and data flow. I'm particularly proud of the optional
+authentication middleware and the intelligent product search algorithm, which
+show my problem-solving skills and attention to detail."
+
+QUESTIONS I SHOULD BE PREPARED TO ANSWER:
+------------------------------------------
+
+Q: "How does the AI chatbot work?"
+A: "I integrated OpenAI's GPT-4o-mini model through their API. When a user sends
+a message, I first detect if it's a product query or order query. For product
+queries, I extract keywords, normalize them (handle singular/plural), search
+MongoDB, and send the results to OpenAI along with a system prompt that
+instructs it to be helpful and respond in the user's language. OpenAI generates
+a natural language response with product recommendations, which I return to the
+user."
+
+Q: "How do you ensure data security?"
+A: "I implement multiple security layers: JWT authentication for all protected
+routes, password hashing with bcrypt, filtering database queries by user ID to
+prevent unauthorized access, never storing full credit card numbers (only last
+4 digits), and using HTTPS for all API communication. I also validate all input
+data at the API level before it reaches the database."
+
+Q: "How does the mobile app stay in sync with the website?"
+A: "Both platforms use the exact same backend API and MongoDB database. When a
+user adds a product to their cart on the mobile app, it makes an API call to
+POST /api/home/product/add-to-card, which saves it to MongoDB. If they then
+open the website and log in, it fetches the cart from the same database, so
+they see the same items. It's a single source of truth architecture."
+
+Q: "What was the most challenging part of this project?"
+A: "The most challenging part was implementing the AI chatbot with proper
+security. I needed it to be accessible to guest users for product browsing, but
+also secure for order tracking. I solved this by creating an optional
+authentication middleware that allows both use cases. Another challenge was the
+product search - making it understand natural language queries like 'laptops
+for students' required keyword extraction and normalization algorithms."
+
+Q: "How would you scale this application?"
+A: "For scaling, I would: 1) Add Redis caching for frequently accessed products
+and categories, 2) Implement database indexing on commonly queried fields,
+3) Use MongoDB sharding for horizontal scaling, 4) Add a load balancer for the
+API server, 5) Implement CDN for static assets, 6) Add rate limiting to prevent
+abuse, 7) Optimize images with lazy loading and WebP format, 8) Implement
+server-side pagination for large datasets."
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================
+
+This documentation was created by Daniel Knafel on October 18, 2025.
+All code and implementations described here were developed by me as part of
+the EasyShop e-commerce platform project.
+
+For questions or clarifications, please refer to the actual code files
+mentioned throughout this document.
+
+Good luck with your presentation! 🚀
+

@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Error message:', error.message);
       return {
         success: false,
-        message: error.response?.data?.error || error.response?.data?.message || 'שגיאה בהתחברות'
+        message: error.response?.data?.error || error.response?.data?.message || 'Error בLogin'
       };
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }) => {
         console.log('✅ User registered and logged in automatically');
       }
 
-      return { success: !!data, message: data?.message || 'הרשמה בוצעה בהצלחה' };
+      return { success: !!data, message: data?.message || 'Register בוצעה successfully' };
     } catch (error) {
       console.error('❌ Register error:', error);
       console.error('Error response data:', error.response?.data);
@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Error status:', error.response?.status);
       return {
         success: false,
-        message: error.response?.data?.error || error.response?.data?.message || 'שגיאה בהרשמה'
+        message: error.response?.data?.error || error.response?.data?.message || 'Error בRegister'
       };
     } finally {
       setLoading(false);

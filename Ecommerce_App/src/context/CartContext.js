@@ -109,7 +109,7 @@ export const CartProvider = ({ children }) => {
           return { success: true, message: 'המוצר נוסף לעגלה' };
         } else {
           console.log('❌ Failed to add product:', response.data);
-          return { success: false, message: response.data.error || 'שגיאה בהוספה לעגלה' };
+          return { success: false, message: response.data.error || 'Error בהוספה לעגלה' };
         }
       } else {
         console.log('🛒 Adding to cart (guest):', product.name);
@@ -135,7 +135,7 @@ export const CartProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Error adding to cart:', error);
       console.error('❌ Error response:', error.response?.data);
-      return { success: false, message: error.response?.data?.error || 'שגיאה בהוספה לעגלה' };
+      return { success: false, message: error.response?.data?.error || 'Error בהוספה לעגלה' };
     }
   };
 
@@ -196,20 +196,38 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = async () => {
     try {
+      console.log('🗑️ Clearing cart...', { itemCount: cartItems.length, hasUser: !!user, hasToken: !!token });
+
       if (user && token) {
         // Delete all cart items one by one
+        console.log('🗑️ Deleting cart items from server...');
         for (const item of cartItems) {
-          await api.delete(`/home/product/delete-card-products/${item._id}`);
+          try {
+            console.log('🗑️ Deleting item:', item._id);
+            await api.delete(`/home/product/delete-card-products/${item._id}`);
+            console.log('✅ Deleted item:', item._id);
+          } catch (deleteError) {
+            console.error('❌ Error deleting item:', item._id, deleteError);
+            // Continue deleting other items even if one fails
+          }
         }
+        console.log('✅ All items deleted from server');
         setCartItems([]);
         setCartCount(0);
+        console.log('✅ Cart state cleared');
       } else {
+        console.log('🗑️ Clearing local cart (no user/token)');
         setCartItems([]);
         setCartCount(0);
         await AsyncStorage.removeItem('localCart');
+        console.log('✅ Local cart cleared');
       }
+
+      console.log('✅ Cart cleared successfully!');
+      return { success: true };
     } catch (error) {
-      console.error('Error clearing cart:', error);
+      console.error('❌ Error clearing cart:', error);
+      return { success: false, error };
     }
   };
 

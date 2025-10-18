@@ -36,7 +36,7 @@ export default function LoginScreen({ navigation }) {
     console.log('Password:', state.password ? '***' : 'empty');
 
     if (!state.email || !state.password) {
-      Alert.alert('שגיאה', 'אנא מלא את כל השדות');
+      Alert.alert('Error', 'Please fill in את כל השדות');
       return;
     }
 
@@ -49,13 +49,13 @@ export default function LoginScreen({ navigation }) {
 
     if (result.success) {
       console.log('✅ Login successful! Navigating to Main...');
-      Alert.alert('הצלחה', 'התחברת בהצלחה!', [
+      Alert.alert('הצלחה', 'התחברת בSuccess!', [
         { text: 'אישור', onPress: () => navigation.replace('Main') }
       ]);
     } else {
       console.log('❌ Login failed:', result.message);
       console.log('❌ Full error result:', result);
-      Alert.alert('שגיאה', result.message || 'ההתחברות נכשלה');
+      Alert.alert('Error', result.message || 'הLogin נכשלה');
     }
   };
 
@@ -85,17 +85,17 @@ export default function LoginScreen({ navigation }) {
 
         {/* Login Form Card */}
         <View style={styles.formCard}>
-          <Text style={styles.title}>התחברות</Text>
+          <Text style={styles.title}>Login</Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>אימייל</Text>
+            <Text style={styles.label}>Email</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="mail-outline" size={20} color="#64748b" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={state.email}
                 onChangeText={(text) => inputHandle('email', text)}
-                placeholder="הכנס את האימייל שלך"
+                placeholder="הכנס את הEmail שלך"
                 placeholderTextColor="#94a3b8"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -104,14 +104,14 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>סיסמה</Text>
+            <Text style={styles.label}>Password</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={state.password}
                 onChangeText={(text) => inputHandle('password', text)}
-                placeholder="הכנס את הסיסמה שלך"
+                placeholder="הכנס את הPassword שלך"
                 placeholderTextColor="#94a3b8"
                 secureTextEntry
               />

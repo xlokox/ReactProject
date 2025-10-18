@@ -30,12 +30,12 @@ export default function RegisterScreen({ navigation }) {
     console.log('Form data:', { name: formData.name, email: formData.email, password: '***', confirmPassword: '***' });
 
     if (!formData.name || !formData.email || !formData.password) {
-      Alert.alert('שגיאה', 'אנא מלא את כל השדות הנדרשים');
+      Alert.alert('Error', 'Please fill in את כל השדות הנדרשים');
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert('שגיאה', 'הסיסמאות אינן תואמות');
+      Alert.alert('Error', 'הסיסמאות אינן תואמות');
       return;
     }
 
@@ -48,13 +48,13 @@ export default function RegisterScreen({ navigation }) {
 
     if (result.success) {
       console.log('✅ Registration successful! Navigating to Main...');
-      Alert.alert('הצלחה!', result.message, [
+      Alert.alert('Success!', result.message, [
         { text: 'אישור', onPress: () => navigation.replace('Main') }
       ]);
     } else {
       console.log('❌ Registration failed:', result.message);
       console.log('❌ Full error result:', result);
-      Alert.alert('שגיאה', result.message);
+      Alert.alert('Error', result.message);
     }
   };
 
@@ -66,10 +66,10 @@ export default function RegisterScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Card style={styles.card}>
           <Card.Content>
-            <Title style={styles.title}>הרשמה</Title>
+            <Title style={styles.title}>Register</Title>
 
             <TextInput
-              label="שם מלא *"
+              label="Full Name *"
               value={formData.name}
               onChangeText={(text) => setFormData({...formData, name: text})}
               mode="outlined"
@@ -77,7 +77,7 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <TextInput
-              label="אימייל *"
+              label="Email *"
               value={formData.email}
               onChangeText={(text) => setFormData({...formData, email: text})}
               mode="outlined"
@@ -87,7 +87,7 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <TextInput
-              label="טלפון"
+              label="Phone"
               value={formData.phone}
               onChangeText={(text) => setFormData({...formData, phone: text})}
               mode="outlined"
@@ -96,7 +96,7 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <TextInput
-              label="סיסמה *"
+              label="Password *"
               value={formData.password}
               onChangeText={(text) => setFormData({...formData, password: text})}
               mode="outlined"
@@ -105,7 +105,7 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <TextInput
-              label="אימות סיסמה *"
+              label="אימות Password *"
               value={formData.confirmPassword}
               onChangeText={(text) => setFormData({...formData, confirmPassword: text})}
               mode="outlined"

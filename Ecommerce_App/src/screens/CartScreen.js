@@ -31,7 +31,7 @@ export default function CartScreen({ navigation }) {
     loadCart
   } = useCart();
 
-  const SHIPPING_FEE = 10; // Fixed shipping fee: 10 ₪
+  const SHIPPING_FEE = 5; // Fixed shipping fee: $5
 
   // Reload cart whenever the screen comes into focus
   useFocusEffect(
@@ -51,12 +51,12 @@ export default function CartScreen({ navigation }) {
 
   const handleRemoveItem = (itemId) => {
     Alert.alert(
-      'הסרת מוצר',
-      'האם אתה בטוח שברצונך להסיר את המוצר מהעגלה?',
+      'Remove Item',
+      'Are you sure you want to remove this item from cart?',
       [
-        { text: 'ביטול', style: 'cancel' },
-        { 
-          text: 'הסר', 
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
           style: 'destructive',
           onPress: () => removeFromCart(itemId)
         },
@@ -66,7 +66,7 @@ export default function CartScreen({ navigation }) {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('עגלה ריקה', 'אנא הוסף מוצרים לעגלה לפני המעבר לתשלום');
+      Alert.alert('Empty Cart', 'Please add items to cart before checkout');
       return;
     }
     navigation.navigate('Checkout');
@@ -85,7 +85,7 @@ export default function CartScreen({ navigation }) {
           <Paragraph style={styles.itemName} numberOfLines={2}>
             {item.product.name}
           </Paragraph>
-          <Title style={styles.itemPrice}>₪{item.product.price}</Title>
+          <Title style={styles.itemPrice}>${item.product.price}</Title>
           
           <View style={styles.quantityContainer}>
             <IconButton
@@ -112,7 +112,7 @@ export default function CartScreen({ navigation }) {
             onPress={() => handleRemoveItem(item._id)}
           />
           <Title style={styles.itemTotal}>
-            ₪{(item.product.price * item.quantity).toFixed(2)}
+            ${(item.product.price * item.quantity).toFixed(2)}
           </Title>
         </View>
       </View>
@@ -122,9 +122,9 @@ export default function CartScreen({ navigation }) {
   const renderEmptyCart = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="cart-outline" size={80} color="#ccc" />
-      <Title style={styles.emptyTitle}>העגלה שלך ריקה</Title>
+      <Title style={styles.emptyTitle}>Your cart is empty</Title>
       <Paragraph style={styles.emptyText}>
-        הוסף מוצרים לעגלה כדי להתחיל לקנות
+        Add items to cart to start shopping
       </Paragraph>
       <Button
         mode="contained"
@@ -132,7 +132,7 @@ export default function CartScreen({ navigation }) {
         style={styles.shopButton}
         buttonColor="#059473"
       >
-        התחל לקנות
+        Start Shopping
       </Button>
     </View>
   );
@@ -154,32 +154,32 @@ export default function CartScreen({ navigation }) {
       <Card style={styles.summaryCard}>
         <Card.Content>
           <View style={styles.summaryRow}>
-            <Paragraph>סה"כ פריטים:</Paragraph>
+            <Paragraph>Total Items:</Paragraph>
             <Paragraph>{cartItems.length}</Paragraph>
           </View>
 
           <View style={styles.summaryRow}>
-            <Paragraph>סה"כ כמות:</Paragraph>
+            <Paragraph>Total Quantity:</Paragraph>
             <Paragraph>
               {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
             </Paragraph>
           </View>
 
           <View style={styles.summaryRow}>
-            <Paragraph>סכום ביניים:</Paragraph>
-            <Paragraph>₪{getCartTotal().toFixed(2)}</Paragraph>
+            <Paragraph>Subtotal:</Paragraph>
+            <Paragraph>${getCartTotal().toFixed(2)}</Paragraph>
           </View>
 
           <View style={styles.shippingRow}>
-            <Paragraph style={styles.shippingText}>משלוח:</Paragraph>
-            <Paragraph style={styles.shippingText}>₪{SHIPPING_FEE.toFixed(2)}</Paragraph>
+            <Paragraph style={styles.shippingText}>Shipping:</Paragraph>
+            <Paragraph style={styles.shippingText}>${SHIPPING_FEE.toFixed(2)}</Paragraph>
           </View>
 
           <Divider style={styles.divider} />
 
           <View style={styles.totalRow}>
-            <Title>סה"כ לתשלום:</Title>
-            <Title style={styles.totalAmount}>₪{(getCartTotal() + SHIPPING_FEE).toFixed(2)}</Title>
+            <Title>Total:</Title>
+            <Title style={styles.totalAmount}>${(getCartTotal() + SHIPPING_FEE).toFixed(2)}</Title>
           </View>
 
           <Button
@@ -190,7 +190,7 @@ export default function CartScreen({ navigation }) {
             loading={loading}
             disabled={loading}
           >
-            המשך לתשלום
+            Proceed to Checkout
           </Button>
         </Card.Content>
       </Card>

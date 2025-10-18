@@ -20,12 +20,12 @@ export default function ProfileScreen({ navigation }) {
 
   const handleLogout = () => {
     Alert.alert(
-      'התנתקות',
-      'האם אתה בטוח שברצונך להתנתק?',
+      'Logoutות',
+      'האם אתה בטוח שברצונך לLogout?',
       [
-        { text: 'ביטול', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'התנתק', 
+          text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -52,21 +52,21 @@ export default function ProfileScreen({ navigation }) {
 
       <Card style={styles.menuCard}>
         <List.Item
-          title="עריכת פרופיל"
+          title="עריכת Profile"
           left={props => <List.Icon {...props} icon="account-edit" />}
           right={props => <List.Icon {...props} icon="chevron-right" />}
           onPress={() => {/* Navigate to edit profile */}}
         />
         
         <List.Item
-          title="כתובות משלוח"
+          title="כתובות Shipping"
           left={props => <List.Icon {...props} icon="map-marker" />}
           right={props => <List.Icon {...props} icon="chevron-right" />}
           onPress={() => {/* Navigate to addresses */}}
         />
         
         <List.Item
-          title="אמצעי תשלום"
+          title="Payment Method"
           left={props => <List.Icon {...props} icon="credit-card" />}
           right={props => <List.Icon {...props} icon="chevron-right" />}
           onPress={() => {/* Navigate to payment methods */}}
@@ -93,7 +93,7 @@ export default function ProfileScreen({ navigation }) {
         style={styles.logoutButton}
         textColor="#F44336"
       >
-        התנתק
+        Logout
       </Button>
     </ScrollView>
   );

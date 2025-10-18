@@ -13,8 +13,11 @@ import RealLoginScreen from './src/screens/LoginScreen';
 import RealRegisterScreen from './src/screens/RegisterScreen';
 import RealCartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import OrderConfirmationScreen from './src/screens/OrderConfirmationScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import ChatBotScreen from './src/screens/ChatBotScreen';
+import OrdersScreen from './src/screens/OrdersScreen';
+import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import FloatingChatButton from './src/components/FloatingChatButton';
 import GlobalFloatingChatButton from './src/components/GlobalFloatingChatButton';
 import getProductImageSource from './src/utils/image';
@@ -726,7 +729,12 @@ function ProductsScreen({ navigation, route }) {
   const fetchPage = React.useCallback(async (page, reset=false) => {
     try {
       if (reset) setLoading(true); else setLoadingMore(true);
-      const qs = `category=${encodeURIComponent(category || '')}&&searchValue=${encodeURIComponent(searchQuery || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}`;
+      // Add random=true when no category/search is selected (Shop All view)
+      const isRandom = (!category && !searchQuery);
+      const randomParam = isRandom ? '&&random=true' : '';
+      // Add timestamp to prevent caching when random=true
+      const timestampParam = isRandom ? `&&_t=${Date.now()}` : '';
+      const qs = `category=${encodeURIComponent(category || '')}&&searchValue=${encodeURIComponent(searchQuery || '')}&&lowPrice=0&&highPrice=100000&&pageNumber=${page}&&parPage=${parPage}${randomParam}${timestampParam}`;
       const r = await fetch(`${API_BASE_URL}/home/query-products?${qs}`);
       const d = await r.json();
       const live = Array.isArray(d.products) ? d.products : [];
@@ -1262,7 +1270,10 @@ function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('OrderHistory')}
+        >
           <Ionicons name="receipt-outline" size={24} color="#059473" />
           <Text style={styles.menuText}>Order History</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -2182,8 +2193,23 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="OrderConfirmation"
+            component={OrderConfirmationScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="ChatBot"
             component={ChatBotScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="OrderHistory"
+            component={OrdersScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="OrderDetail"
+            component={OrderDetailScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
