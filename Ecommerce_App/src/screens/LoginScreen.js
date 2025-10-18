@@ -41,9 +41,11 @@ export default function LoginScreen({ navigation }) {
     }
 
     console.log('✅ Calling login API...');
+    console.log('📤 Sending to backend:', { email: state.email });
+
     const result = await authLogin(state.email, state.password);
 
-    console.log('Login result:', result);
+    console.log('📥 Login result received:', result);
 
     if (result.success) {
       console.log('✅ Login successful! Navigating to Main...');
@@ -52,6 +54,7 @@ export default function LoginScreen({ navigation }) {
       ]);
     } else {
       console.log('❌ Login failed:', result.message);
+      console.log('❌ Full error result:', result);
       Alert.alert('שגיאה', result.message || 'ההתחברות נכשלה');
     }
   };

@@ -103,6 +103,7 @@ export default function ProductsScreen({ navigation, route }) {
             {item.name}
           </Paragraph>
           <Title style={styles.productPrice}>₪{item.price}</Title>
+          <Paragraph style={styles.shippingText}>משלוח: ₪10</Paragraph>
           <Button
             mode="contained"
             compact
@@ -232,6 +233,12 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 16,
     color: '#2196F3',
+    marginBottom: 4,
+  },
+  shippingText: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   addButton: {

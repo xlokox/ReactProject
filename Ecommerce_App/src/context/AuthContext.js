@@ -40,22 +40,30 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setLoading(true);
+      console.log('🔐 Login attempt with email:', email);
       const { data } = await api.post('/customer/login', { email, password });
+
+      console.log('✅ Login response received:', data);
 
       if (data?.token) {
         await AsyncStorage.setItem('customerToken', data.token);
+        console.log('✅ Token saved to AsyncStorage');
       }
       if (data?.userInfo) {
         await AsyncStorage.setItem('customerInfo', JSON.stringify(data.userInfo));
+        console.log('✅ User info saved to AsyncStorage');
       }
       setToken(data?.token || null);
       setUser(data?.userInfo || null);
+      console.log('✅ Login successful!');
       return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'שגיאה בהתחברות' 
+      console.error('❌ Login error:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error message:', error.message);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.response?.data?.message || 'שגיאה בהתחברות'
       };
     } finally {
       setLoading(false);
@@ -66,9 +74,11 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       console.log('📝 Registering user:', userData.email);
+      console.log('📝 User data:', { name: userData.name, email: userData.email });
+
       const { data } = await api.post('/customer/register', userData);
 
-      console.log('Registration response:', data);
+      console.log('✅ Registration response received:', data);
 
       // If registration successful and returns token, log the user in automatically
       if (data?.token && data?.userInfo) {
@@ -82,7 +92,9 @@ export const AuthProvider = ({ children }) => {
       return { success: !!data, message: data?.message || 'הרשמה בוצעה בהצלחה' };
     } catch (error) {
       console.error('❌ Register error:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error message:', error.message);
+      console.error('Error status:', error.response?.status);
       return {
         success: false,
         message: error.response?.data?.error || error.response?.data?.message || 'שגיאה בהרשמה'

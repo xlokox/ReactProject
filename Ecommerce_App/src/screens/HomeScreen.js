@@ -17,7 +17,6 @@ import Categories from '../components/Categories';
 import FeatureProducts from '../components/FeatureProducts';
 import Products from '../components/Products';
 import Footer from '../components/Footer';
-import ConnectionTest from '../components/ConnectionTest';
 
 const { width } = Dimensions.get('window');
 
@@ -38,7 +37,6 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container}>
       <Header navigation={navigation} />
-      <ConnectionTest />
       <Banner navigation={navigation} />
       <Categories navigation={navigation} />
 

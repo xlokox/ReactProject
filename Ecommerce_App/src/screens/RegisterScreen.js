@@ -27,7 +27,7 @@ export default function RegisterScreen({ navigation }) {
 
   const handleRegister = async () => {
     console.log('📝 Register button clicked');
-    console.log('Form data:', { ...formData, password: '***', confirmPassword: '***' });
+    console.log('Form data:', { name: formData.name, email: formData.email, password: '***', confirmPassword: '***' });
 
     if (!formData.name || !formData.email || !formData.password) {
       Alert.alert('שגיאה', 'אנא מלא את כל השדות הנדרשים');
@@ -40,9 +40,11 @@ export default function RegisterScreen({ navigation }) {
     }
 
     console.log('✅ Calling register API...');
+    console.log('📤 Sending to backend:', { name: formData.name, email: formData.email });
+
     const result = await register(formData);
 
-    console.log('Register result:', result);
+    console.log('📥 Register result received:', result);
 
     if (result.success) {
       console.log('✅ Registration successful! Navigating to Main...');
@@ -51,6 +53,7 @@ export default function RegisterScreen({ navigation }) {
       ]);
     } else {
       console.log('❌ Registration failed:', result.message);
+      console.log('❌ Full error result:', result);
       Alert.alert('שגיאה', result.message);
     }
   };

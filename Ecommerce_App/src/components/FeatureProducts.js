@@ -120,13 +120,15 @@ export default function FeatureProducts({ products, navigation }) {
         </Text>
         
         <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>${item.price}</Text>
+          <Text style={styles.currentPrice}>₪{item.price}</Text>
           {item.discount > 0 && (
             <Text style={styles.originalPrice}>
-              ${Math.floor(item.price + (item.price * item.discount) / 100)}
+              ₪{Math.floor(item.price + (item.price * item.discount) / 100)}
             </Text>
           )}
         </View>
+
+        <Text style={styles.shippingText}>משלוח: ₪10</Text>
 
         <View style={styles.ratingContainer}>
           {[...Array(5)].map((_, index) => (
@@ -251,6 +253,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     textDecorationLine: 'line-through',
+  },
+  shippingText: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   ratingContainer: {
     flexDirection: 'row',

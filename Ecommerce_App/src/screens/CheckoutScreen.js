@@ -23,6 +23,7 @@ export default function CheckoutScreen({ navigation }) {
   const { cartItems, getCartTotal, clearCart } = useCart();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const SHIPPING_FEE = 10; // Fixed shipping fee: 10 ₪
   const [shippingAddress, setShippingAddress] = useState({
     street: '',
     city: '',
@@ -64,10 +65,11 @@ export default function CheckoutScreen({ navigation }) {
       setLoading(true);
 
       // Prepare order data in the format expected by the backend
+      const SHIPPING_FEE = 10; // Fixed shipping fee: 10 ₪
       const orderData = {
         userId: cartItems[0]?.userId || 'guest', // Get userId from cart items
         price: getCartTotal(),
-        shipping_fee: 0, // You can calculate shipping fee if needed
+        shipping_fee: SHIPPING_FEE,
         shippingInfo: `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.zipCode}, ${shippingAddress.country}`,
         products: [{
           sellerId: cartItems[0]?.product?.sellerId || '507f1f77bcf86cd799439011', // Default seller ID
@@ -158,8 +160,12 @@ export default function CheckoutScreen({ navigation }) {
               </Paragraph>
             </View>
           ))}
+          <View style={styles.shippingRow}>
+            <Paragraph style={styles.shippingText}>משלוח:</Paragraph>
+            <Paragraph style={styles.shippingText}>₪{SHIPPING_FEE.toFixed(2)}</Paragraph>
+          </View>
           <View style={styles.totalRow}>
-            <Title>סה"כ: ₪{getCartTotal().toFixed(2)}</Title>
+            <Title>סה"כ לתשלום: ₪{(getCartTotal() + SHIPPING_FEE).toFixed(2)}</Title>
           </View>
         </Card.Content>
       </Card>
@@ -342,6 +348,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 4,
+  },
+  shippingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  shippingText: {
+    color: '#FFD700',
+    fontWeight: 'bold',
   },
   totalRow: {
     marginTop: 16,

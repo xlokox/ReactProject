@@ -43,11 +43,12 @@ export default function ProductDetailScreen({ route, navigation }) {
         <Card.Content>
           <Title style={styles.productName}>{product.name}</Title>
           <Title style={styles.productPrice}>₪{product.price}</Title>
-          
+          <Paragraph style={styles.shippingText}>משלוח: ₪10</Paragraph>
+
           {product.category && (
             <Chip style={styles.categoryChip}>{product.category}</Chip>
           )}
-          
+
           <Paragraph style={styles.description}>
             {product.description || 'אין תיאור זמין למוצר זה.'}
           </Paragraph>
@@ -86,6 +87,12 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 20,
     color: '#2196F3',
+    marginBottom: 8,
+  },
+  shippingText: {
+    fontSize: 14,
+    color: '#FFD700',
+    fontWeight: 'bold',
     marginBottom: 16,
   },
   categoryChip: {

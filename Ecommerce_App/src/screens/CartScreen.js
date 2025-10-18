@@ -31,6 +31,8 @@ export default function CartScreen({ navigation }) {
     loadCart
   } = useCart();
 
+  const SHIPPING_FEE = 10; // Fixed shipping fee: 10 ₪
+
   // Reload cart whenever the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
@@ -163,11 +165,21 @@ export default function CartScreen({ navigation }) {
             </Paragraph>
           </View>
 
+          <View style={styles.summaryRow}>
+            <Paragraph>סכום ביניים:</Paragraph>
+            <Paragraph>₪{getCartTotal().toFixed(2)}</Paragraph>
+          </View>
+
+          <View style={styles.shippingRow}>
+            <Paragraph style={styles.shippingText}>משלוח:</Paragraph>
+            <Paragraph style={styles.shippingText}>₪{SHIPPING_FEE.toFixed(2)}</Paragraph>
+          </View>
+
           <Divider style={styles.divider} />
 
           <View style={styles.totalRow}>
             <Title>סה"כ לתשלום:</Title>
-            <Title style={styles.totalAmount}>₪{getCartTotal().toFixed(2)}</Title>
+            <Title style={styles.totalAmount}>₪{(getCartTotal() + SHIPPING_FEE).toFixed(2)}</Title>
           </View>
 
           <Button
@@ -250,6 +262,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  shippingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  shippingText: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   divider: {
     marginVertical: 12,

@@ -46,10 +46,17 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+    console.log('Response data:', response.data);
     return response;
   },
   async (error) => {
     console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`);
+    console.error('Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code
+    });
 
     if (error.response?.status === 401) {
       // Token expired or invalid - clear stored auth data
