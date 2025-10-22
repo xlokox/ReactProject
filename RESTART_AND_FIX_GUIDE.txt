@@ -1,0 +1,270 @@
+================================================================================
+                    RESTART AND FIX GUIDE
+================================================================================
+
+Date: October 19, 2025
+Issue: Application not working after IP change
+Solution: Restart all services with updated CORS configuration
+
+================================================================================
+                        WHAT WAS FIXED
+================================================================================
+
+✅ 1. Updated CORS Configuration in Backend
+   File: Ecommerce/backend/server.js
+   
+   Added:
+   - 'http://172.20.0.90:3000' (Frontend)
+   - 'http://172.20.0.90:3001' (Dashboard)
+   - Regex pattern for all 172.x.x.x IPs on ports 3000, 3001, 3002, 5001
+   
+   This allows the frontend and dashboard to communicate with the backend
+   from the new IP address.
+
+✅ 2. Updated Dashboard API Configuration
+   File: Ecommerce/dashboard/.env
+   
+   Added:
+   REACT_APP_API_URL=http://172.20.0.90:5001/api
+   
+   This tells the dashboard where to find the backend API.
+
+✅ 3. All Configuration Files Updated
+   - Ecommerce_App/.env ✅
+   - Ecommerce/frontend/.env ✅
+   - Ecommerce/backend/.env ✅
+   - Ecommerce/dashboard/.env ✅
+   - Ecommerce/backend/server.js ✅
+
+================================================================================
+                        RESTART INSTRUCTIONS
+================================================================================
+
+IMPORTANT: Kill all running services first!
+
+Step 1: Kill All Running Services
+──────────────────────────────────
+```bash
+# Kill all Node processes
+killall node
+
+# Or if that doesn't work, find and kill specific processes
+lsof -i :3000 -i :3001 -i :5001 | grep node | awk '{print $2}' | xargs kill -9
+```
+
+Step 2: Clear Cache (Optional but Recommended)
+──────────────────────────────────────────────
+```bash
+# Frontend
+cd Ecommerce/frontend
+rm -rf node_modules/.cache
+npm cache clean --force
+
+# Dashboard
+cd ../dashboard
+rm -rf node_modules/.cache
+npm cache clean --force
+
+# Mobile App
+cd ../../Ecommerce_App
+rm -rf node_modules/.cache
+npm cache clean --force
+```
+
+Step 3: Restart Services in Separate Terminals
+───────────────────────────────────────────────
+
+TERMINAL 1 - Backend Server:
+```bash
+cd Ecommerce/backend
+npm start
+```
+Expected output:
+✅ 🚀 Server running on port 5001
+✅ 📦 MongoDB connected
+✅ 🔌 Socket.io initialized
+
+TERMINAL 2 - Frontend Website:
+```bash
+cd Ecommerce/frontend
+npm start
+```
+Expected output:
+✅ Compiled successfully!
+✅ On Your Network: http://172.20.0.90:3000
+
+TERMINAL 3 - Dashboard:
+```bash
+cd Ecommerce/dashboard
+npm start
+```
+Expected output:
+✅ Compiled successfully!
+✅ On Your Network: http://172.20.0.90:3001
+
+TERMINAL 4 - Mobile App:
+```bash
+cd Ecommerce_App
+npm start
+```
+Expected output:
+✅ Expo development server started
+✅ Tunnel ready at: exp://...
+✅ Scan QR code with Expo Go
+
+================================================================================
+                        VERIFICATION STEPS
+================================================================================
+
+1. Test Backend Connection
+   ────────────────────────
+   ```bash
+   curl http://172.20.0.90:5001/api/test
+   ```
+   
+   Expected response:
+   {
+     "success": true,
+     "message": "Backend server is connected and working!",
+     "timestamp": "2025-10-19T06:30:26.000Z"
+   }
+
+2. Test Frontend
+   ──────────────
+   Open browser: http://172.20.0.90:3000
+   
+   Expected:
+   ✅ Page loads without errors
+   ✅ Products display
+   ✅ Can navigate to different pages
+   ✅ Console shows: "Using API URL: http://172.20.0.90:5001/api"
+
+3. Test Dashboard
+   ───────────────
+   Open browser: http://172.20.0.90:3001
+   
+   Expected:
+   ✅ Dashboard loads
+   ✅ Can login with admin credentials
+   ✅ Can view products and orders
+
+4. Test Mobile App
+   ────────────────
+   Scan QR code from Expo with Expo Go app
+   
+   Expected:
+   ✅ App loads on phone
+   ✅ Can see products
+   ✅ Can login
+   ✅ Can add to cart
+   ✅ Console shows: "API_BASE_URL -> http://172.20.0.90:5001/api"
+
+================================================================================
+                        TROUBLESHOOTING
+================================================================================
+
+Problem 1: "Cannot GET /api/test"
+──────────────────────────────────
+Solution:
+- Check if backend is running: lsof -i :5001
+- Check backend logs for errors
+- Verify MongoDB is running: mongod --version
+
+Problem 2: "CORS error" or "Access to XMLHttpRequest blocked"
+──────────────────────────────────────────────────────────────
+Solution:
+- Backend CORS has been updated ✅
+- Clear browser cache: Ctrl+Shift+Delete
+- Hard refresh: Ctrl+Shift+R (or Cmd+Shift+R on Mac)
+- Check browser console for exact error
+
+Problem 3: Frontend shows "API URL: http://localhost:5001/api"
+──────────────────────────────────────────────────────────────
+Solution:
+- Frontend .env file not loaded
+- Kill frontend: Ctrl+C
+- Verify .env file exists: cat Ecommerce/frontend/.env
+- Restart: npm start
+
+Problem 4: Dashboard shows "Cannot connect to API"
+───────────────────────────────────────────────────
+Solution:
+- Check dashboard .env: cat Ecommerce/dashboard/.env
+- Should show: REACT_APP_API_URL=http://172.20.0.90:5001/api
+- Kill dashboard: Ctrl+C
+- Restart: npm start
+
+Problem 5: Mobile app shows "Network Error"
+────────────────────────────────────────────
+Solution:
+- Check Ecommerce_App/.env: cat Ecommerce_App/.env
+- Should show: API_BASE_URL=http://172.20.0.90:5001/api
+- Kill Expo: Ctrl+C
+- Clear cache: npm start -- --clear
+- Restart: npm start
+- Scan new QR code
+
+Problem 6: "Port already in use"
+────────────────────────────────
+Solution:
+```bash
+# Find what's using the port
+lsof -i :3000  # or :3001 or :5001
+
+# Kill the process
+kill -9 <PID>
+
+# Or kill all node processes
+killall node
+```
+
+Problem 7: "Cannot find module" errors
+───────────────────────────────────────
+Solution:
+```bash
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+npm start
+```
+
+================================================================================
+                        QUICK REFERENCE
+================================================================================
+
+IP Address: 172.20.0.90
+
+Services:
+- Backend API: http://172.20.0.90:5001
+- Frontend: http://172.20.0.90:3000
+- Dashboard: http://172.20.0.90:3001
+- Mobile App: Scan QR from Expo
+
+Configuration Files:
+- Ecommerce_App/.env
+- Ecommerce/frontend/.env
+- Ecommerce/backend/.env
+- Ecommerce/backend/server.js (CORS)
+- Ecommerce/dashboard/.env
+
+Test Endpoints:
+- Backend: http://172.20.0.90:5001/api/test
+- Health: http://172.20.0.90:5001/api/health
+
+================================================================================
+                        NEXT STEPS
+================================================================================
+
+1. ✅ Kill all running services
+2. ✅ Restart all services in separate terminals
+3. ✅ Verify each service is running
+4. ✅ Test API connection
+5. ✅ Test frontend
+6. ✅ Test dashboard
+7. ✅ Test mobile app
+8. ✅ Check browser console for errors
+9. ✅ Check terminal logs for errors
+10. ✅ If issues persist, check troubleshooting section
+
+================================================================================
+

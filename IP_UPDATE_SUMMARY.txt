@@ -1,0 +1,178 @@
+================================================================================
+                    IP ADDRESS UPDATE SUMMARY
+================================================================================
+
+Date: October 19, 2025
+Old IP: 10.0.0.3
+New IP: 172.20.0.90
+Reason: WiFi network change - switched to new LAN
+
+================================================================================
+                        FILES UPDATED
+================================================================================
+
+✅ 1. Ecommerce_App/.env (Mobile App)
+   ────────────────────────────────────
+   OLD:
+   API_BASE_URL=http://10.0.0.3:5001/api
+   SOCKET_URL=http://10.0.0.3:5001
+
+   NEW:
+   API_BASE_URL=http://172.20.0.90:5001/api
+   SOCKET_URL=http://172.20.0.90:5001
+
+   Purpose: Mobile app connects to backend API and Socket.io server
+
+
+✅ 2. Ecommerce/frontend/.env (Website)
+   ────────────────────────────────────
+   OLD:
+   REACT_APP_API_URL=http://localhost:5001/api
+
+   NEW:
+   REACT_APP_API_URL=http://172.20.0.90:5001/api
+
+   Purpose: Website frontend connects to backend API
+
+
+✅ 3. Ecommerce/backend/.env (Backend Server)
+   ────────────────────────────────────────────
+   OLD:
+   ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
+   NEW:
+   ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://172.20.0.90:3000,http://172.20.0.90:3001
+
+   Purpose: Backend CORS configuration allows requests from new IP addresses
+
+
+================================================================================
+                        NETWORK CONFIGURATION
+================================================================================
+
+Active Network Interface (en0):
+- IP Address: 172.20.0.90
+- Netmask: 255.255.240.0
+- Broadcast: 172.20.15.255
+- MAC Address: 06:fd:3d:59:98:16
+- IPv6: fe80::cf5:c830:661f:1d0f%en0
+
+Backend Server:
+- Port: 5001
+- URL: http://172.20.0.90:5001
+- API Endpoint: http://172.20.0.90:5001/api
+
+Frontend (Website):
+- Port: 3000
+- URL: http://172.20.0.90:3000
+
+Dashboard (Admin):
+- Port: 3001
+- URL: http://172.20.0.90:3001
+
+Mobile App (Expo):
+- Tunnel Mode: LAN
+- API URL: http://172.20.0.90:5001/api
+- Socket URL: http://172.20.0.90:5001
+
+
+================================================================================
+                        NEXT STEPS
+================================================================================
+
+1. ✅ IP addresses updated in all configuration files
+2. ⏳ Restart all services:
+
+   Terminal 1 - Backend:
+   ```bash
+   cd Ecommerce/backend
+   npm start
+   ```
+
+   Terminal 2 - Frontend:
+   ```bash
+   cd Ecommerce/frontend
+   npm start
+   ```
+
+   Terminal 3 - Dashboard:
+   ```bash
+   cd Ecommerce/dashboard
+   npm start
+   ```
+
+   Terminal 4 - Mobile App:
+   ```bash
+   cd Ecommerce_App
+   npm start
+   ```
+
+3. ⏳ Test connections:
+   - Website: http://172.20.0.90:3000
+   - Dashboard: http://172.20.0.90:3001
+   - Backend API: http://172.20.0.90:5001/api/test
+   - Mobile App: Scan new QR code from Expo
+
+4. ⏳ Verify all features work:
+   - Login/Register on website
+   - Login/Register on mobile app
+   - Add products to cart
+   - Place orders
+   - Admin dashboard functionality
+   - Real-time chat (Socket.io)
+
+
+================================================================================
+                        TROUBLESHOOTING
+================================================================================
+
+If you encounter connection issues:
+
+1. Verify backend is running:
+   ```bash
+   curl http://172.20.0.90:5001/api/test
+   ```
+
+2. Check if firewall is blocking connections:
+   - Mac: System Preferences → Security & Privacy → Firewall
+
+3. Ensure all devices are on the same WiFi network
+
+4. Clear browser cache and restart Expo:
+   ```bash
+   # Kill Expo
+   Ctrl+C
+
+   # Clear cache
+   npm start -- --clear
+
+   # Or use tunnel mode
+   npx expo start --tunnel
+   ```
+
+5. Check network connectivity:
+   ```bash
+   ping 172.20.0.90
+   ```
+
+
+================================================================================
+                        IMPORTANT NOTES
+================================================================================
+
+✅ All three applications (Website, Dashboard, Mobile App) now use the same
+   backend server at 172.20.0.90:5001
+
+✅ CORS is configured to accept requests from both localhost and the new IP
+   address for development flexibility
+
+✅ Socket.io connections for real-time chat are configured to use the new IP
+
+✅ Mobile app will automatically use the new IP when scanning the QR code
+   from Expo tunnel
+
+✅ Redux Persist will maintain user login state across app restarts
+
+
+================================================================================
+

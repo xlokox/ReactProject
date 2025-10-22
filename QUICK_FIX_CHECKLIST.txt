@@ -1,0 +1,216 @@
+================================================================================
+                    QUICK FIX CHECKLIST
+================================================================================
+
+IP Address: 172.20.0.90
+Date: October 19, 2025
+
+================================================================================
+                        STEP 1: KILL ALL SERVICES
+================================================================================
+
+[ ] Open Terminal
+[ ] Run: killall node
+[ ] Wait 2 seconds
+[ ] Verify all services stopped: lsof -i :3000 -i :3001 -i :5001
+
+================================================================================
+                        STEP 2: VERIFY CONFIGURATION FILES
+================================================================================
+
+[ ] Check Ecommerce_App/.env
+    Expected: API_BASE_URL=http://172.20.0.90:5001/api
+    Command: cat Ecommerce_App/.env
+
+[ ] Check Ecommerce/frontend/.env
+    Expected: REACT_APP_API_URL=http://172.20.0.90:5001/api
+    Command: cat Ecommerce/frontend/.env
+
+[ ] Check Ecommerce/dashboard/.env
+    Expected: REACT_APP_API_URL=http://172.20.0.90:5001/api
+    Command: cat Ecommerce/dashboard/.env
+
+[ ] Check Ecommerce/backend/.env
+    Expected: ALLOWED_ORIGINS includes 172.20.0.90
+    Command: cat Ecommerce/backend/.env | grep ALLOWED_ORIGINS
+
+================================================================================
+                        STEP 3: START BACKEND
+================================================================================
+
+[ ] Open Terminal 1
+[ ] Run: cd Ecommerce/backend && npm start
+[ ] Wait for: "🚀 Server running on port 5001"
+[ ] Wait for: "📦 MongoDB connected"
+[ ] Test: curl http://172.20.0.90:5001/api/test
+[ ] Expected: {"success": true, ...}
+
+================================================================================
+                        STEP 4: START FRONTEND
+================================================================================
+
+[ ] Open Terminal 2
+[ ] Run: cd Ecommerce/frontend && npm start
+[ ] Wait for: "Compiled successfully!"
+[ ] Wait for: "On Your Network: http://172.20.0.90:3000"
+[ ] Open browser: http://172.20.0.90:3000
+[ ] Check console: "Using API URL: http://172.20.0.90:5001/api"
+[ ] Verify: Products display on page
+
+================================================================================
+                        STEP 5: START DASHBOARD
+================================================================================
+
+[ ] Open Terminal 3
+[ ] Run: cd Ecommerce/dashboard && npm start
+[ ] Wait for: "Compiled successfully!"
+[ ] Wait for: "On Your Network: http://172.20.0.90:3001"
+[ ] Open browser: http://172.20.0.90:3001
+[ ] Verify: Dashboard loads without errors
+
+================================================================================
+                        STEP 6: START MOBILE APP
+================================================================================
+
+[ ] Open Terminal 4
+[ ] Run: cd Ecommerce_App && npm start
+[ ] Wait for: "Expo development server started"
+[ ] Wait for: QR code appears in terminal
+[ ] On phone: Open Expo Go app
+[ ] Scan QR code
+[ ] Wait for app to load
+[ ] Verify: Products display on phone
+
+================================================================================
+                        STEP 7: VERIFY ALL CONNECTIONS
+================================================================================
+
+Backend Tests:
+[ ] curl http://172.20.0.90:5001/api/test
+    Expected: {"success": true}
+
+[ ] curl http://172.20.0.90:5001/api/health
+    Expected: {"status": "healthy"}
+
+Frontend Tests:
+[ ] Open http://172.20.0.90:3000
+[ ] Check browser console (F12)
+[ ] Look for: "Using API URL: http://172.20.0.90:5001/api"
+[ ] Verify: No CORS errors
+[ ] Verify: Products load
+
+Dashboard Tests:
+[ ] Open http://172.20.0.90:3001
+[ ] Check browser console (F12)
+[ ] Verify: No CORS errors
+[ ] Try to login
+
+Mobile App Tests:
+[ ] Check Expo console
+[ ] Look for: "API_BASE_URL -> http://172.20.0.90:5001/api"
+[ ] Verify: No network errors
+[ ] Try to login
+
+================================================================================
+                        STEP 8: FUNCTIONAL TESTS
+================================================================================
+
+Frontend:
+[ ] Can view products
+[ ] Can search products
+[ ] Can view product details
+[ ] Can add to cart
+[ ] Can view cart
+[ ] Can login/register
+[ ] Can place order
+
+Dashboard:
+[ ] Can login
+[ ] Can view products
+[ ] Can add product
+[ ] Can edit product
+[ ] Can delete product
+[ ] Can view orders
+
+Mobile App:
+[ ] Can view products
+[ ] Can search products
+[ ] Can view product details
+[ ] Can add to cart
+[ ] Can view cart
+[ ] Can login/register
+[ ] Can place order
+
+================================================================================
+                        TROUBLESHOOTING QUICK FIXES
+================================================================================
+
+If Frontend shows "Cannot connect to API":
+[ ] Kill frontend: Ctrl+C
+[ ] Check .env: cat Ecommerce/frontend/.env
+[ ] Verify IP: 172.20.0.90
+[ ] Restart: npm start
+[ ] Hard refresh browser: Ctrl+Shift+R
+
+If Dashboard shows "Cannot connect to API":
+[ ] Kill dashboard: Ctrl+C
+[ ] Check .env: cat Ecommerce/dashboard/.env
+[ ] Verify IP: 172.20.0.90
+[ ] Restart: npm start
+[ ] Hard refresh browser: Ctrl+Shift+R
+
+If Mobile App shows "Network Error":
+[ ] Kill Expo: Ctrl+C
+[ ] Check .env: cat Ecommerce_App/.env
+[ ] Verify IP: 172.20.0.90
+[ ] Clear cache: npm start -- --clear
+[ ] Restart: npm start
+[ ] Scan new QR code
+
+If "Port already in use":
+[ ] Run: killall node
+[ ] Wait 2 seconds
+[ ] Try again
+
+If "CORS error":
+[ ] Backend CORS has been updated ✅
+[ ] Clear browser cache: Ctrl+Shift+Delete
+[ ] Hard refresh: Ctrl+Shift+R
+[ ] Check backend logs for errors
+
+================================================================================
+                        FINAL VERIFICATION
+================================================================================
+
+All services running:
+[ ] Backend: lsof -i :5001 | grep node
+[ ] Frontend: lsof -i :3000 | grep node
+[ ] Dashboard: lsof -i :3001 | grep node
+
+All accessible:
+[ ] http://172.20.0.90:5001/api/test ✅
+[ ] http://172.20.0.90:3000 ✅
+[ ] http://172.20.0.90:3001 ✅
+[ ] Mobile app via Expo ✅
+
+All working:
+[ ] Frontend loads and connects to API ✅
+[ ] Dashboard loads and connects to API ✅
+[ ] Mobile app loads and connects to API ✅
+[ ] Can login on all platforms ✅
+[ ] Can add to cart on all platforms ✅
+
+================================================================================
+                        SUCCESS!
+================================================================================
+
+If all checkboxes are checked, your application is working correctly!
+
+If you encounter any issues:
+1. Check RESTART_AND_FIX_GUIDE.txt for detailed troubleshooting
+2. Check terminal logs for error messages
+3. Check browser console (F12) for errors
+4. Verify all .env files have correct IP: 172.20.0.90
+
+================================================================================
+
